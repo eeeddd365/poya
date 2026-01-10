@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>POYA 北屯東山二</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root { --poya-pink: #ec008c; --poya-gradient: linear-gradient(135deg, #ec008c 0%, #ff66b2 100%); --poya-bg: #fdf2f8; }
+    body { background-color: var(--poya-bg); font-family: 'Noto Sans TC', sans-serif; color: #333; padding-bottom: 60px; overflow-x: hidden; }
+    
+    #notif-banner { display: none; background: var(--poya-gradient); color: white; padding: 12px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; }
+
+    .flat-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; margin-bottom: 12px; padding: 18px; box-shadow: 0 4px 15px rgba(236, 0, 140, 0.05); }
+    .duty-card { background: var(--poya-gradient); color: white; border-radius: 20px; padding: 18px; margin-bottom: 15px; box-shadow: 0 8px 16px rgba(236, 0, 140, 0.2); }
+    
+    .nav-tabs-poya { display: flex; background: white; border-radius: 15px; padding: 5px; margin: 15px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .nav-item-poya { flex: 1; text-align: center; padding: 10px; border-radius: 12px; color: #999; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+    .nav-item-poya.active { background: var(--poya-gradient); color: white; }
+
+    /* 日曆與姓名樣式優化 */
+    .calendar-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-cell { background: white; border-radius: 10px; padding: 4px 1px; text-align: center; min-height: 125px; border: 1px solid #f0f0f0; }
+    .cal-date { font-weight: 700; color: #ccc; font-size: 0.85rem; border-bottom: 1px solid #f9f9f9; margin-bottom: 4px; }
+    .cal-is-today { border: 2px solid var(--poya-pink); background: #fff0f6; }
+    .staff-tag-full { display: block; line-height: 1.3; margin-bottom: 2px; padding: 4px 1px; border-radius: 6px; font-weight: 700; font-size: 0.95rem !important; }
+    .s-O { background-color: #fff0f6; color: #ec008c; } 
+    .s-X { background-color: #e6f7ff; color: #1890ff; }
+
+    /* 虛擬鍵盤美化 */
+    .key { background: white; border-radius: 18px; width: 75px; height: 75px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.06); transition: all 0.1s; border: 1px solid #eee; }
+    .key:active { background: #f0f0f0; transform: scale(0.95); box-shadow: inset 0 2px 5px rgba(0,0,0,0.1); }
+    .key-clear { color: #ff4d4f; }
+
+    #loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; align-items: center; justify-content: center; }
+    .btn-pink { background: var(--poya-gradient); color: white; border: none; border-radius: 50px; padding: 10px 20px; font-weight: 600; }
+    .stock-img-sm { width: 75px; height: 75px; object-fit: cover; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <div id="loading"><div class="spinner-border text-danger"></div></div>
+  <div id="notif-banner" onclick="switchTab('stk')"><i class="fas fa-bell me-2"></i> 有包裹待領，請點此查看</div>
+
+  <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px; margin-bottom: 5px;">POYA</h1>
+    <p class="text-muted small mb-4">北屯東山二系統</p>
+    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; color:#333; font-weight: 700; letter-spacing: 8px;">---</div>
+    <div class="keypad d-grid" style="grid-template-columns: repeat(3, 1fr); gap: 20px;">
+      <div class="key" onclick="pressKey('1')">1</div><div class="key" onclick="pressKey('2')">2</div><div class="key" onclick="pressKey('3')">3</div>
+      <div class="key" onclick="pressKey('4')">4</div><div class="key" onclick="pressKey('5')">5</div><div class="key" onclick="pressKey('6')">6</div>
+      <div class="key" onclick="pressKey('7')">7</div><div class="key" onclick="pressKey('8')">8</div><div class="key" onclick="pressKey('9')">9</div>
+      <div style="visibility:hidden"></div><div class="key" onclick="pressKey('0')">0</div><div class="key key-clear" onclick="pressKey('C')"><i class="fas fa-backspace"></i></div>
+    </div>
+  </div>
+
+  <div id="view-main" style="display:none;" class="container py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 id="u-name" class="fw-bold mb-0">夥伴</h4>
+        <button class="btn btn-pink btn-sm shadow-sm" onclick="openStockModal()">包裹入庫</button>
+    </div>
+
+    <div class="nav-tabs-poya shadow-sm">
+        <div id="t-ros" class="nav-item-poya active" onclick="switchTab('ros')">今日班表</div>
+        <div id="t-stk" class="nav-item-poya" onclick="switchTab('stk')">入庫管理</div>
+        <div id="t-drv" class="nav-item-poya" onclick="switchTab('drv')">公務檔案</div>
+        <div id="t-adm" class="nav-item-poya" style="display:none;" onclick="switchTab('adm')">系統管理</div>
+    </div>
+
+    <div id="v-ros">
+        <div class="flat-card py-2 mb-2 text-center" style="background:#fffbe6; border: 1px solid #ffe58f;"><small id="v-note" class="fw-bold text-warning">事項讀取中...</small></div>
+        <div class="duty-card shadow">
+            <div class="row text-center">
+                <div class="col">早班值日<br><span id="v-dD" class="fw-bold fs-4">--</span></div>
+                <div class="col" style="border-left: 1px solid rgba(255,255,255,0.3);">晚班值日<br><span id="v-dN" class="fw-bold fs-4">--</span></div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="changeDate(-1)">前一天</button>
+            <span id="h-date" class="fw-bold pt-1"></span>
+            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="changeDate(1)">後一天</button>
+        </div>
+        <div class="row g-2 mb-4">
+            <div class="col-6"><div class="flat-card h-100"><b class="text-pink">早班</b><hr class="my-2"><div id="l-day" class="small"></div></div></div>
+            <div class="col-6"><div class="flat-card h-100"><b class="text-primary">晚班</b><hr class="my-2"><div id="l-night" class="small"></div></div></div>
+        </div>
+        <div class="flat-card p-2">
+            <div class="btn-group w-100 mb-3 p-1 bg-light rounded-pill">
+                <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="toggleCalMode('my')">個人</button>
+                <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="toggleCalMode('all')">全店</button>
+            </div>
+            <div id="cal-grid" class="calendar-container"></div>
+        </div>
+    </div>
+
+    <div id="v-stk" style="display:none;"><div id="stk-list"></div></div>
+    
+    <div id="v-drv" style="display:none;">
+        <div id="drv-admin-area" style="display:none;" class="flat-card mb-3">
+            <h6>上傳公務檔</h6>
+            <input type="file" id="up-drv-file" class="form-control mb-2">
+            <button class="btn btn-pink w-100 btn-sm" onclick="uploadToDrive()">點我上傳</button>
+        </div>
+        <div id="drv-list"></div>
+    </div>
+
+    <div id="v-adm" style="display:none;"><div class="flat-card">
+        <input type="file" id="xl-file" class="form-control mb-2"><button class="btn btn-pink w-100" onclick="uploadExcel()">同步 Excel 班表</button>
+    </div></div>
+  </div>
+
+  <div class="modal fade" id="stockModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0" style="border-radius:25px;"><div class="modal-body p-4">
+    <h5 class="fw-bold mb-4">包裹入庫</h5>
+    <select id="st-owner" class="form-select mb-3"></select>
+    <input type="text" id="st-note" class="form-control mb-3" placeholder="存放位置">
+    <input type="file" id="st-photo" class="form-control mb-4" accept="image/*" capture="camera">
+    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="submitStock()">送出並通知夥伴</button>
+  </div></div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
