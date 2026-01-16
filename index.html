@@ -10,19 +10,37 @@
   <style>
     :root { --poya-pink: #ec008c; --poya-gradient: linear-gradient(135deg, #ec008c 0%, #ff66b2 100%); --poya-bg: #fdf2f8; }
     body { background-color: var(--poya-bg); font-family: 'Noto Sans TC', sans-serif; color: #333; padding-bottom: 80px; }
+    
     #loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; }
-    .btn-pink { background: var(--poya-gradient); color: white; border: none; border-radius: 50px; padding: 10px 20px; font-weight: 700; box-shadow: 0 4px 10px rgba(236,0,140,0.2); }
+    .btn-pink { background: var(--poya-gradient); color: white; border: none; border-radius: 50px; padding: 10px 20px; font-weight: 700; box-shadow: 0 4px 10px rgba(236, 0, 140, 0.2); }
     .flat-card { background: white; border-radius: 20px; margin-bottom: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
     .nav-tabs-poya { display: flex; background: white; border-radius: 15px; padding: 5px; margin: 15px 0; }
     .nav-item-poya { flex: 1; text-align: center; padding: 10px; border-radius: 12px; color: #999; font-size: 0.85rem; cursor: pointer; }
     .nav-item-poya.active { background: var(--poya-gradient); color: white; font-weight: bold; }
+    
+    /* 值日生強烈對比樣式 */
+    .duty-card { background: white; border-radius: 25px; padding: 18px; margin-bottom: 15px; box-shadow: 0 10px 25px rgba(236, 0, 140, 0.1); }
+    .duty-box-day { 
+      background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%); 
+      color: white; border-radius: 18px; padding: 12px; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+    }
+    .duty-box-night { 
+      background: linear-gradient(135deg, #2196f3 0%, #002e73 100%); 
+      color: white; border-radius: 18px; padding: 12px; box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    }
+    .duty-label { font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px; }
+    .duty-name { font-size: 1.6rem; font-weight: 900; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+    /* 日曆自動適應 */
     .calendar-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-    .cal-cell { background: white; border-radius: 8px; padding: 2px; text-align: center; min-height: 110px; border: 1px solid #f0f0f0; display: flex; flex-direction: column; }
+    .cal-cell { background: white; border-radius: 8px; padding: 2px; text-align: center; min-height: 110px; border: 1px solid #f0f0f0; display: flex; flex-direction: column; overflow: hidden; }
     .cal-date { font-weight: 700; color: #bbb; font-size: 0.75rem; margin-bottom: 2px; border-bottom: 1px solid #f9f9f9; }
     .cal-is-today { border: 2.2px solid var(--poya-pink); background: #fff0f6; }
     .staff-tag-group { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; flex-grow: 1; align-content: flex-start; }
     .staff-tag-full { padding: 1px 2px; border-radius: 4px; font-weight: 700; line-height: 1.1; font-size: clamp(0.6rem, 2vw, 0.8rem) !important; white-space: nowrap; }
     .s-O { background-color: #fff0f6; color: #ec008c; } .s-X { background-color: #e6f7ff; color: #1890ff; }
+
+    /* 鍵盤 */
     .key { background: white; border-radius: 18px; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; transition: 0.1s; }
     .key:active { background: #f0f0f0; transform: scale(0.92); }
     #notif-banner { display: none; background: var(--poya-gradient); color: white; padding: 12px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; cursor: pointer; }
@@ -30,7 +48,7 @@
 </head>
 <body>
   <div id="loading"><div class="spinner-border text-danger"></div></div>
-  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 您有新包裹，請查看！</div>
+  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 您有包裹待領，請點此查看</div>
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
     <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
@@ -46,7 +64,7 @@
   <div id="view-main" style="display:none;" class="container py-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 id="u-name" class="fw-bold mb-0">夥伴</h4>
-        <button class="btn btn-pink btn-sm" onclick="window.openStockModal()">入庫拍攝</button>
+        <button class="btn btn-pink btn-sm shadow" onclick="window.openStockModal()">入庫拍攝</button>
     </div>
 
     <div class="nav-tabs-poya shadow-sm">
@@ -57,17 +75,29 @@
     </div>
 
     <div id="v-ros">
-        <div class="flat-card py-2 mb-2 text-center" style="background:#fffbe6;"><small id="v-note" class="fw-bold text-warning">事項載入中...</small></div>
-        <div class="duty-card shadow p-3 rounded-4 mb-3 text-white">
-            <div class="row text-center">
-                <div class="col">早值：<span id="v-dD" class="fw-bold">--</span></div>
-                <div class="col border-start border-white border-opacity-25">晚值：<span id="v-dN" class="fw-bold">--</span></div>
+        <div class="flat-card py-2 mb-2 text-center" style="background:#fffbe6; border: 1px solid #ffe58f;"><small id="v-note" class="fw-bold text-warning">事項載入中...</small></div>
+        
+        <div class="duty-card">
+            <div class="row g-2">
+                <div class="col-6">
+                    <div class="duty-box-day text-center">
+                        <div class="duty-label">早班值日</div>
+                        <div id="v-dD" class="duty-name">--</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="duty-box-night text-center">
+                        <div class="duty-label">晚班值日</div>
+                        <div id="v-dN" class="duty-name">--</div>
+                    </div>
+                </div>
             </div>
         </div>
+
         <div class="d-flex justify-content-between mb-2 px-1">
-            <button class="btn btn-sm btn-light" onclick="window.changeDate(-1)">前一天</button>
+            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(-1)">前一天</button>
             <span id="h-date" class="fw-bold small pt-1"></span>
-            <button class="btn btn-sm btn-light" onclick="window.changeDate(1)">後一天</button>
+            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(1)">後一天</button>
         </div>
         <div class="row g-2 mb-3">
             <div class="col-6"><div class="flat-card h-100 p-2"><b class="small">早班</b><hr class="my-1"><div id="l-day"></div></div></div>
@@ -83,8 +113,8 @@
     </div>
 
     <div id="v-stk" style="display:none;"><div id="stk-list"></div></div>
-    <div id="v-drv" style="display:none;"><div id="drv-admin-area" style="display:none;" class="flat-card mb-3"><h6>上傳公務檔</h6><input type="file" id="up-drv-file" class="form-control mb-2"><button class="btn btn-pink w-100 btn-sm" onclick="window.uploadToDrive()">點我上傳</button></div><div id="drv-list"></div></div>
-    <div id="v-adm" style="display:none;"><div class="flat-card"><h6>班表同步</h6><input type="file" id="xl-file" class="form-control mb-2"><button class="btn btn-pink w-100" onclick="window.uploadExcel()">同步 Excel</button></div></div>
+    <div id="v-drv" style="display:none;"><div id="drv-admin-area" style="display:none;" class="flat-card mb-3"><h6>管理上傳</h6><input type="file" id="up-drv-file" class="form-control mb-2"><button class="btn btn-pink w-100 btn-sm" onclick="window.uploadToDrive()">上傳檔案</button></div><div id="drv-list"></div></div>
+    <div id="v-adm" style="display:none;"><div class="flat-card"><h6>班表更新</h6><input type="file" id="xl-file" class="form-control mb-2"><button class="btn btn-pink w-100" onclick="window.uploadExcel()">同步 Excel</button></div></div>
   </div>
 
   <div class="modal fade" id="stockModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0" style="border-radius:25px;"><div class="modal-body p-4">
