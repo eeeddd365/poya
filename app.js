@@ -5,7 +5,7 @@ const _sb = supabase.createClient(SB_URL, SB_KEY);
 const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志誠','E':'鄧雅惠','F':'莊嘉銘','N':'倪世宗','G':'蔡明峯','B':'黃郁涵','M':'張淑貞' };
 let currentUser = null, currentCode = "", selectedDate = new Date(), stModal = null, calMode = 'my', allMonthData = [];
 
-// --- 核心掛載 ---
+// --- 掛載全域函式 ---
 window.openStockModal = async function() {
     const el = document.getElementById('stockModal');
     if (!stModal && el) stModal = new bootstrap.Modal(el);
@@ -15,7 +15,8 @@ window.openStockModal = async function() {
 
 window.pressKey = function(val) {
     if (val === 'C') currentCode = ""; else if (currentCode.length < 3) currentCode += val;
-    document.getElementById('code-val').innerText = currentCode || "---";
+    const el = document.getElementById('code-val');
+    if (el) el.innerText = currentCode || "---";
     if (currentCode.length === 3) checkLogin();
 };
 
@@ -34,37 +35,66 @@ window.toggleCalMode = function(m) {
     renderCalendar(); 
 };
 
+// --- 登入與初始化 ---
+async function checkLogin() {
+    setLoad(true);
+    try {
+        const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
+        if (data) {
+            currentUser = data;
+            const uEl = document.getElementById('u-name'); if(uEl) uEl.innerText = "夥伴, " + data.name;
+            if (currentUser.code === '555') {
+                document.getElementById('t-adm').style.display = 'block';
+                document.getElementById('drv-admin-area').style.display = 'block';
+            }
+            document.getElementById('view-login').style.display = 'none';
+            document.getElementById('view-main').style.display = 'block';
+            await initApp();
+        } else { alert("代碼錯誤"); currentCode = ""; window.pressKey('C'); }
+    } catch(e) { console.error(e); } finally { setLoad(false); }
+}
+
+async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
+
 // --- 資料抓取與「事項」精確修正 ---
 async function fetchMainData() {
     const ds = selectedDate.toISOString().split('T')[0];
     document.getElementById('h-date').innerText = ds;
     
+    // 抓取當月份資料
     const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
     allMonthData = data || [];
     
     const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), noteEl = document.getElementById('v-note');
-    if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
-    
-    // 【關鍵修正】強制先設為「無事項」，後續有抓到當天才會覆蓋
-    if(noteEl) noteEl.innerText = "今日無事項";
+    const dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
 
-    allMonthData.filter(x => x.date === ds).forEach(r => {
+    // 【1. 暴力初始化】切換日期時，先強行重置所有畫面內容，避免舊資料殘留
+    if(ld) ld.innerHTML = ''; 
+    if(ln) ln.innerHTML = '';
+    if(noteEl) noteEl.innerText = "今日無事項";
+    if(dD) dD.innerText = "--";
+    if(dN) dN.innerText = "--";
+    
+    // 【2. 精確篩選】只過濾出「當天」的資料
+    const todayRows = allMonthData.filter(x => x.date === ds);
+    
+    todayRows.forEach(r => {
         const n = String(r.staff_name).trim();
-        // 修正內容判定
         const c = (r.shift_code === null || r.shift_code === undefined) ? "" : String(r.shift_code).trim();
 
         if(n === "事項") {
+            // 只有當天真的有內容時才覆蓋
             if(noteEl && c !== "" && c !== "null" && c !== "undefined") {
                 noteEl.innerText = c;
             }
         }
-        else if(n === "早班值日") { document.getElementById('v-dD').innerText = staffMap[c] || c || "--"; }
-        else if(n === "晚班值日") { document.getElementById('v-dN').innerText = staffMap[c] || c || "--"; }
+        else if(n === "早班值日") { if(dD) dD.innerText = staffMap[c] || c || "--"; }
+        else if(n === "晚班值日") { if(dN) dN.innerText = staffMap[c] || c || "--"; }
         else {
             const s = parseShift(c);
             if(s.isW) {
                 const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${n}</span><b>${s.disp}</b></div>`;
-                if(s.type === 'day') ld.innerHTML += h; else ln.innerHTML += h;
+                if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; }
             }
         }
     });
@@ -77,31 +107,14 @@ function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休'
 function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
 function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
 
-async function checkLogin() {
-    setLoad(true);
-    try {
-        const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
-        if (data) {
-            currentUser = data;
-            document.getElementById('u-name').innerText = "夥伴, " + data.name;
-            if (currentUser.code === '555') { document.getElementById('t-adm').style.display = 'block'; document.getElementById('drv-admin-area').style.display = 'block'; }
-            document.getElementById('view-login').style.display = 'none';
-            document.getElementById('view-main').style.display = 'block';
-            await initApp();
-        } else { alert("錯誤"); currentCode = ""; window.pressKey('C'); }
-    } catch(e) { console.error(e); } finally { setLoad(false); }
-}
-
-async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
-
 window.submitStock = async function() {
     const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
-    if(!o || !n) return alert("必填");
+    if(!o || !n) return alert("必填項目未完成");
     setLoad(true);
     try {
         let p = null;
         if(f) {
-            const comp = await imageCompression(f, {maxSizeMB: 0.15, maxWidthOrHeight: 1024});
+            const comp = await imageCompression(f, {maxSizeMB: 0.15});
             const fname = `stock/${Date.now()}.jpg`;
             const { data, error } = await _sb.storage.from('photos').upload(fname, comp);
             if(error) throw error; p = data.path;
@@ -140,7 +153,7 @@ async function fetchStock() {
     const l = document.getElementById('stk-list'); if(l) l.innerHTML = data?.map(i => {
         const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : null;
         return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px;"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${getShortName(i.owner_name)}</div><div class="small text-muted">備註：${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">完成</button></div></div>`;
-    }).join('') || '<div class="p-4 text-center text-muted small">無包裹</div>';
+    }).join('') || '<div class="p-3 text-center text-muted small">目前無包裹</div>';
 }
 async function fetchDriveFiles() {
     const { data } = await _sb.storage.from('public_files').list('', {sortBy:{column:'created_at',order:'desc'}});
@@ -148,7 +161,7 @@ async function fetchDriveFiles() {
         let disp = f.name; try { const r = f.name.split('_').slice(1).join('_'); disp = decodeURIComponent(r.replace(/__/g, '%')); } catch(e){}
         const u = _sb.storage.from('public_files').getPublicUrl(f.name).data.publicUrl;
         const del = (currentUser && currentUser.code === '555') ? `<button class="btn btn-sm text-danger border-0" onclick="window.deleteFile('${f.name}')"><i class="fas fa-trash-alt"></i></button>` : '';
-        return `<div class="flat-card d-flex justify-content-between align-items-center mb-2"><span class="text-truncate small fw-bold" style="max-width:70%">${disp}</span><div><a href="${u}" target="_blank" class="btn btn-sm btn-outline-primary me-2">看</a>${del}</div></div>`;
+        return `<div class="flat-card d-flex justify-content-between align-items-center mb-2"><span class="text-truncate small fw-bold" style="max-width:70%"><i class="far fa-file-pdf text-danger me-2"></i>${disp}</span><div><a href="${u}" target="_blank" class="btn btn-sm btn-outline-primary me-2">看</a>${del}</div></div>`;
     }).join('') || '無檔案';
 }
 
