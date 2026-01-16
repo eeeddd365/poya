@@ -5,7 +5,7 @@ const _sb = supabase.createClient(SB_URL, SB_KEY);
 const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志誠','E':'鄧雅惠','F':'莊嘉銘','N':'倪世宗','G':'蔡明峯','B':'黃郁涵','M':'張淑貞' };
 let currentUser = null, currentCode = "", selectedDate = new Date(), stModal = null, calMode = 'my', allMonthData = [];
 
-// --- 掛載全域函式確保 HTML 找得到 ---
+// --- 掛載全域函式 ---
 window.openStockModal = async function() {
     const el = document.getElementById('stockModal');
     if (!stModal && el) stModal = new bootstrap.Modal(el);
@@ -96,16 +96,35 @@ function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.ro
 async function fetchMainData() {
     const ds = selectedDate.toISOString().split('T')[0];
     document.getElementById('h-date').innerText = ds;
+    
+    // 抓取當月份資料
     const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
     allMonthData = data || [];
+    
     const ld = document.getElementById('l-day'), ln = document.getElementById('l-night');
     if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
-    allMonthData.filter(x => x.date === ds).forEach(r => {
+    
+    // 重設事項區塊為預設值
+    const noteEl = document.getElementById('v-note');
+    if(noteEl) noteEl.innerText = "今日無事項";
+    
+    // 過濾出當天的所有紀錄
+    const todayRows = allMonthData.filter(x => x.date === ds);
+    
+    todayRows.forEach(r => {
         const n = r.staff_name, c = r.shift_code;
-        if(n === "事項") { document.getElementById('v-note').innerText = c; }
+        if(n === "事項") { 
+            if(noteEl && c && c.trim() !== "") noteEl.innerText = c; 
+        }
         else if(n === "早班值日") { document.getElementById('v-dD').innerText = staffMap[c] || c; }
         else if(n === "晚班值日") { document.getElementById('v-dN').innerText = staffMap[c] || c; }
-        else { const s = parseShift(c); if(s.isW) { const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${n}</span><b>${s.disp}</b></div>`; if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; } } }
+        else { 
+            const s = parseShift(c); 
+            if(s.isW) { 
+                const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${n}</span><b>${s.disp}</b></div>`; 
+                if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; } 
+            } 
+        }
     });
     renderCalendar();
 }
