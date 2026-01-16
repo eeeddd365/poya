@@ -3,38 +3,61 @@ const SB_KEY = 'sb_publishable_yccbuWDlTisa2DvaRJEX9w_R1l8BBMB';
 const _sb = supabase.createClient(SB_URL, SB_KEY);
 
 const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志誠','E':'鄧雅惠','F':'莊嘉銘','N':'倪世宗','G':'蔡明峯','B':'黃郁涵','M':'張淑貞' };
-let currentUser = null, currentCode = "", selectedDate = new Date(), stModal = null, invM = null, adjM = null, calMode = 'my', allMonthData = [];
+let currentUser = null, currentCode = "", selectedDate = new Date(), stM = null, invM = null, adjM = null, calMode = 'my', allMonthData = [];
 let html5QrCode = null, curAdjId = null, curAdjQty = 0;
 
-// --- 初始化與掛載 ---
-window.openStockModal = async function() {
-    const el = document.getElementById('stockModal');
-    if (!stModal && el) stModal = new bootstrap.Modal(el);
-    await fetchStaffList();
-    if (stModal) stModal.show();
+// --- 介面切換 (解決選單卡住) ---
+window.switchTab = function(t) {
+    if(t !== 'inv') window.stopScan();
+    // 隱藏所有視圖
+    const views = ['v-ros','v-stk','v-inv','v-drv','v-adm'];
+    views.forEach(v => {
+        const el = document.getElementById(v);
+        if(el) el.style.display = 'none';
+    });
+    // 取消所有 Tab 活性
+    const tabs = ['t-ros','t-stk','t-inv','t-drv','t-adm'];
+    tabs.forEach(tab => {
+        const el = document.getElementById(tab);
+        if(el) el.classList.remove('active');
+    });
+    // 啟動目標
+    const targetV = document.getElementById('v-'+t);
+    const targetT = document.getElementById('t-'+t);
+    if(targetV) targetV.style.display = 'block';
+    if(targetT) targetT.classList.add('active');
 };
 
+// --- 功能視窗掛載 (解決 Not a function 問題) ---
 window.openInvModal = function() {
     const el = document.getElementById('invModal');
     if (!invM && el) invM = new bootstrap.Modal(el);
-    invM.show();
+    if (invM) invM.show();
+};
+
+window.openStockModal = async function() {
+    const el = document.getElementById('stockModal');
+    if (!stM && el) stM = new bootstrap.Modal(el);
+    await fetchStaffList();
+    if (stM) stM.show();
 };
 
 window.pressKey = function(val) {
     if (val === 'C') currentCode = ""; else if (currentCode.length < 3) currentCode += val;
-    document.getElementById('code-val').innerText = currentCode || "---";
+    const el = document.getElementById('code-val');
+    if (el) el.innerText = currentCode || "---";
     if (currentCode.length === 3) checkLogin();
 };
 
-window.switchTab = function(t) {
-    if(t !== 'inv') window.stopScan();
-    ['v-ros','v-stk','v-inv','v-drv','v-adm'].forEach(v => { const el = document.getElementById(v); if(el) el.style.display='none'; });
-    ['t-ros','t-stk','t-inv','t-drv','t-adm'].forEach(v => { const el = document.getElementById(v); if(el) el.classList.remove('active'); });
-    const tv = document.getElementById('v-'+t); if(tv) tv.style.display='block';
-    const tt = document.getElementById('t-'+t); if(tt) tt.classList.add('active');
+window.changeDate = function(n) { selectedDate.setDate(selectedDate.getDate()+n); fetchMainData(); };
+window.toggleCalMode = function(m) { 
+    calMode = m; 
+    document.getElementById('btn-my-cal').classList.toggle('active', m==='my');
+    document.getElementById('btn-all-cal').classList.toggle('active', m==='all');
+    renderCalendar(); 
 };
 
-// --- 條碼掃描邏輯 ---
+// --- 掃描與庫存 ---
 window.startScan = function() {
     document.getElementById('reader').style.display = 'block';
     html5QrCode = new Html5Qrcode("reader");
@@ -42,7 +65,7 @@ window.startScan = function() {
         document.getElementById('i-barcode').value = text;
         window.stopScan();
         autoFillInvName(text);
-    }).catch(err => alert("相機啟動失敗"));
+    }).catch(() => alert("相機啟動失敗"));
 };
 window.stopScan = function() {
     if(html5QrCode) {
@@ -54,39 +77,37 @@ async function autoFillInvName(code) {
     if(data && data.length > 0) document.getElementById('i-name').value = data[0].item_name;
 }
 
-// --- 庫存業務 ---
 window.submitInventory = async function() {
     const d = document.getElementById('i-dept').value, b = document.getElementById('i-barcode').value,
           n = document.getElementById('i-name').value, q = document.getElementById('i-qty').value,
           nt = document.getElementById('i-note').value, f = document.getElementById('i-photo').files[0];
-    if(!d || !b || !n || !q) return alert("請填寫必填欄位");
+    if(!d || !b || !n || !q) return alert("必填欄位未填");
     setLoad(true);
     try {
-        let path = null;
+        let p = null;
         if(f) {
             const comp = await imageCompression(f, {maxSizeMB: 0.1});
             const { data } = await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp);
-            path = data.path;
+            p = data.path;
         }
-        await _sb.from('inventory').insert([{ dept:d, barcode:b, item_name:n, qty:parseInt(q), note:nt, photo_path:path, creator:currentUser.name }]);
-        invM.hide(); alert("庫存建立成功");
-    } catch(e) { alert("儲存失敗"); } finally { setLoad(false); }
+        await _sb.from('inventory').insert([{ dept:d, barcode:b, item_name:n, qty:parseInt(q), note:nt, photo_path:p, creator:currentUser.name }]);
+        invM.hide(); alert("建立成功");
+    } catch(e) { alert("錯誤"); } finally { setLoad(false); }
 };
 
 window.searchInventory = async function() {
     const d = document.getElementById('q-dept').value, b = document.getElementById('q-barcode').value;
-    if(!d && !b) return alert("請輸入查詢條件");
     setLoad(true);
-    let q = _sb.from('inventory').select('*');
-    if(d) q = q.eq('dept', d);
-    if(b) q = q.ilike('barcode', `%${b}%`);
-    const { data } = await q.order('created_at', {ascending: false});
+    let qry = _sb.from('inventory').select('*');
+    if(d) qry = qry.eq('dept', d);
+    if(b) qry = qry.ilike('barcode', `%${b}%`);
+    const { data } = await qry.order('created_at', {ascending: false});
     const res = document.getElementById('inv-results');
     res.innerHTML = data?.map(i => {
-        const url = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : '';
+        const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : '';
         return `<div class="flat-card d-flex align-items-center gap-3" onclick="window.openAdjust('${i.id}','${i.item_name}',${i.qty})">
-            <img src="${url || 'https://via.placeholder.com/60'}" class="inventory-img">
-            <div class="flex-grow-1"><div class="fw-bold">${i.item_name}</div><div class="small text-muted">條碼: ${i.barcode} | 數量: <b class="text-danger">${i.qty}</b></div></div>
+            <img src="${u || 'https://via.placeholder.com/60'}" class="inventory-img">
+            <div class="flex-grow-1"><div class="fw-bold">${i.item_name}</div><div class="small text-muted">條碼: ${i.barcode} | 庫存: <b class="text-danger">${i.qty}</b></div></div>
             <i class="fas fa-chevron-right text-muted"></i>
         </div>`;
     }).join('') || '<div class="text-center p-4">查無資料</div>';
@@ -110,51 +131,36 @@ window.adjustInventory = async function(type) {
     setLoad(false);
 };
 
-// --- 包裹與班表 (保持精確邏輯) ---
-window.submitStock = async function() {
-    const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
-    if(!o || !n) return alert("必填項目未完成");
-    setLoad(true);
-    try {
-        let p = null;
-        if(f) {
-            const comp = await imageCompression(f, {maxSizeMB: 0.15});
-            const { data } = await _sb.storage.from('photos').upload(`stock/${Date.now()}.jpg`, comp);
-            p = data.path;
-        }
-        await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:o, note:n, photo_path:p, status:'待處理'}]);
-        stModal.hide(); fetchStock(); alert("通知已送出");
-    } catch(e) { alert("失敗"); } finally { setLoad(false); }
-};
-
+// --- 原有班表與包裹邏輯 (修正事項邏輯) ---
 async function checkLogin() {
     setLoad(true);
     const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
     if (data) {
         currentUser = data;
         document.getElementById('u-name').innerText = "夥伴, " + data.name;
-        if (currentUser.code === '555') { document.getElementById('t-adm').style.display = 'block'; document.getElementById('drv-admin-area').style.display = 'block'; }
+        if (currentUser.code === '555') document.getElementById('t-adm').style.display = 'block';
         document.getElementById('view-login').style.display = 'none';
         document.getElementById('view-main').style.display = 'block';
-        initApp();
+        await initApp();
     } else { alert("錯誤"); currentCode = ""; document.getElementById('code-val').innerText = "---"; }
     setLoad(false);
 }
+
 async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
+
 async function fetchMainData() {
     const ds = selectedDate.toISOString().split('T')[0];
     document.getElementById('h-date').innerText = ds;
     const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
     allMonthData = data || [];
-    const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), nt = document.getElementById('v-note'),
-          dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
+    const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), nt = document.getElementById('v-note'), dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
     if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
     if(nt) nt.innerText = "今日無事項"; if(dD) dD.innerText = "--"; if(dN) dN.innerText = "--";
     allMonthData.filter(x => x.date === ds).forEach(r => {
         const n = String(r.staff_name).trim(), c = r.shift_code ? String(r.shift_code).trim() : "";
-        if(n === "事項" && c !== "" && c !== "null") { if(nt) nt.innerText = c; }
-        else if(n === "早班值日") { if(dD) dD.innerText = staffMap[c] || c; }
-        else if(n === "晚班值日") { if(dN) dN.innerText = staffMap[c] || c; }
+        if(n === "事項" && c !== "" && c !== "null") { nt.innerText = c; }
+        else if(n === "早班值日") dD.innerText = staffMap[c] || c;
+        else if(n === "晚班值日") dN.innerText = staffMap[c] || c;
         else {
             const s = parseShift(c);
             if(s.isW) {
@@ -165,6 +171,7 @@ async function fetchMainData() {
     });
     renderCalendar();
 }
+
 function renderCalendar() {
     const grid = document.getElementById('cal-grid'); if(!grid) return; grid.innerHTML = '';
     const year = selectedDate.getFullYear(), month = selectedDate.getMonth(), days = new Date(year, month+1, 0).getDate(), dsT = new Date().toISOString().split('T')[0];
@@ -177,28 +184,44 @@ function renderCalendar() {
             if(mine) { const s = parseShift(mine.shift_code); html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'} mt-2" style="font-size:1.1rem !important; width:100%">${s.disp}</div>`; }
         } else {
             html += `<div class="staff-tag-group">`;
-            dayData.forEach(x => { if(!["事項","早班值日","晚班值日"].includes(x.staff_name)) { const s = parseShift(x.shift_code); if(s.isW) html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'}">${n2(x.staff_name)}:${s.disp.substring(0,1)}</div>`; } });
+            dayData.forEach(x => { if(!["事項","早班值日","晚班值日"].includes(x.staff_name)) { const s = parseShift(x.shift_code); if(s.isW) html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'}">${getShortName(x.staff_name)}:${s.disp.substring(0,1)}</div>`; } });
             html += `</div>`;
         }
         grid.innerHTML += html + `</div>`;
     }
 }
-function n2(n) { return n.length > 2 ? n.substring(n.length-2) : n; }
+
+window.submitStock = async function() {
+    const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
+    if(!o || !n) return alert("必填項目未完成");
+    setLoad(true);
+    try {
+        let p = null;
+        if(f) {
+            const comp = await imageCompression(f, {maxSizeMB: 0.15});
+            const { data } = await _sb.storage.from('photos').upload(`stock/${Date.now()}.jpg`, comp);
+            p = data.path;
+        }
+        await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:o, note:n, photo_path:p, status:'待處理'}]);
+        stM.hide(); fetchStock(); alert("通知送出");
+    } catch(e) { alert("失敗"); } finally { setLoad(false); }
+};
+
+// --- 通用輔助 ---
+function getShortName(n) { const s = String(n||""); return s.length > 2 ? s.substring(s.length-2) : s; }
 function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
 function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
-window.changeDate = function(n) { selectedDate.setDate(selectedDate.getDate()+n); fetchMainData(); };
-window.toggleCalMode = function(m) { calMode = m; document.getElementById('btn-my-cal').classList.toggle('active', m==='my'); document.getElementById('btn-all-cal').classList.toggle('active', m==='all'); renderCalendar(); };
 async function fetchStaffList() { const {data}=await _sb.from('staff').select('name').order('name'); document.getElementById('st-owner').innerHTML = data.map(s => `<option value="${s.name}">${s.name}</option>`).join(''); }
 async function fetchStock() {
     const { data } = await _sb.from('stock_items').select('*').eq('status','待處理').order('created_at',{ascending:false});
     const myPkgs = data?.filter(i => i.owner_name === (currentUser?currentUser.name:''));
-    document.getElementById('notif-banner').style.display = myPkgs?.length > 0 ? 'block' : 'none';
+    if(document.getElementById('notif-banner')) document.getElementById('notif-banner').style.display = myPkgs?.length > 0 ? 'block' : 'none';
     document.getElementById('stk-list').innerHTML = data?.map(i => {
         const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : null;
-        return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${n2(i.owner_name)}</div><div class="small text-muted">備註: ${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">完成</button></div></div>`;
-    }).join('') || '<div class="p-3 text-center text-muted small">目前無包裹</div>';
+        return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${getShortName(i.owner_name)}</div><div class="small text-muted">備註: ${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">完成</button></div></div>`;
+    }).join('') || '無包裹';
 }
-window.handleDone = async function(id, p) { if(!confirm("確定完成？")) return; setLoad(true); await _sb.from('stock_items').delete().eq('id', id); if(p && p !== 'null') await _sb.storage.from('photos').remove([p]); fetchStock(); setLoad(false); };
+window.handleDone = async function(id, p) { if(!confirm("完成？")) return; setLoad(true); await _sb.from('stock_items').delete().eq('id', id); if(p && p !== 'null') await _sb.storage.from('photos').remove([p]); fetchStock(); setLoad(false); };
 async function fetchDriveFiles() {
     const { data } = await _sb.storage.from('public_files').list('', {sortBy:{column:'created_at',order:'desc'}});
     document.getElementById('drv-list').innerHTML = data?.map(f => {
