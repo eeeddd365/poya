@@ -5,7 +5,7 @@ const _sb = supabase.createClient(SB_URL, SB_KEY);
 const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志誠','E':'鄧雅惠','F':'莊嘉銘','N':'倪世宗','G':'蔡明峯','B':'黃郁涵','M':'張淑貞' };
 let currentUser = null, currentCode = "", selectedDate = new Date(), stModal = null, calMode = 'my', allMonthData = [];
 
-// --- 介面控制掛載 ---
+// --- 核心掛載 ---
 window.openStockModal = async function() {
     const el = document.getElementById('stockModal');
     if (!stModal && el) stModal = new bootstrap.Modal(el);
@@ -15,8 +15,7 @@ window.openStockModal = async function() {
 
 window.pressKey = function(val) {
     if (val === 'C') currentCode = ""; else if (currentCode.length < 3) currentCode += val;
-    const el = document.getElementById('code-val');
-    if (el) el.innerText = currentCode || "---";
+    document.getElementById('code-val').innerText = currentCode || "---";
     if (currentCode.length === 3) checkLogin();
 };
 
@@ -35,55 +34,7 @@ window.toggleCalMode = function(m) {
     renderCalendar(); 
 };
 
-// --- 核心邏輯 ---
-async function checkLogin() {
-    setLoad(true);
-    try {
-        const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
-        if (data) {
-            currentUser = data;
-            const uEl = document.getElementById('u-name'); if(uEl) uEl.innerText = "夥伴, " + data.name;
-            if (currentUser.code === '555') {
-                document.getElementById('t-adm').style.display = 'block';
-                document.getElementById('drv-admin-area').style.display = 'block';
-            }
-            document.getElementById('view-login').style.display = 'none';
-            document.getElementById('view-main').style.display = 'block';
-            await initApp();
-        } else { alert("代碼錯誤"); currentCode = ""; window.pressKey('C'); }
-    } catch(e) { console.error(e); } finally { setLoad(false); }
-}
-
-async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
-
-// --- 入庫管理 ---
-window.submitStock = async function() {
-    const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
-    if(!o || !n) return alert("收件人與備註必填");
-    setLoad(true);
-    try {
-        let p = null;
-        if(f) {
-            const comp = await imageCompression(f, {maxSizeMB: 0.15, maxWidthOrHeight: 1024});
-            const fname = `stock/${Date.now()}.jpg`;
-            const { data, error } = await _sb.storage.from('photos').upload(fname, comp);
-            if(error) throw error; p = data.path;
-        }
-        await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:o, note:n, photo_path:p, status:'待處理'}]);
-        if(stModal) stModal.hide(); fetchStock(); alert("入庫成功");
-        document.getElementById('st-note').value = ""; document.getElementById('st-photo').value = "";
-    } catch(e) { alert("失敗"); } finally { setLoad(false); }
-};
-
-window.handleDone = async function(id, p) {
-    if(!confirm("確定完成？")) return;
-    setLoad(true);
-    await _sb.from('stock_items').delete().eq('id', id);
-    if(p && p !== 'null') await _sb.storage.from('photos').remove([p]);
-    fetchStock(); setLoad(false);
-};
-
-// --- 班表渲染系統 ---
+// --- 資料抓取與「事項」精確修正 ---
 async function fetchMainData() {
     const ds = selectedDate.toISOString().split('T')[0];
     document.getElementById('h-date').innerText = ds;
@@ -93,13 +44,22 @@ async function fetchMainData() {
     
     const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), noteEl = document.getElementById('v-note');
     if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
-    if(noteEl) noteEl.innerText = "今日無事項"; // 重置預設值
+    
+    // 【關鍵修正】強制先設為「無事項」，後續有抓到當天才會覆蓋
+    if(noteEl) noteEl.innerText = "今日無事項";
 
     allMonthData.filter(x => x.date === ds).forEach(r => {
-        const n = String(r.staff_name).trim(), c = r.shift_code ? String(r.shift_code).trim() : "";
-        if(n === "事項" && c !== "" && c !== "null") { if(noteEl) noteEl.innerText = c; }
-        else if(n === "早班值日") { document.getElementById('v-dD').innerText = staffMap[c] || c; }
-        else if(n === "晚班值日") { document.getElementById('v-dN').innerText = staffMap[c] || c; }
+        const n = String(r.staff_name).trim();
+        // 修正內容判定
+        const c = (r.shift_code === null || r.shift_code === undefined) ? "" : String(r.shift_code).trim();
+
+        if(n === "事項") {
+            if(noteEl && c !== "" && c !== "null" && c !== "undefined") {
+                noteEl.innerText = c;
+            }
+        }
+        else if(n === "早班值日") { document.getElementById('v-dD').innerText = staffMap[c] || c || "--"; }
+        else if(n === "晚班值日") { document.getElementById('v-dN').innerText = staffMap[c] || c || "--"; }
         else {
             const s = parseShift(c);
             if(s.isW) {
@@ -110,6 +70,48 @@ async function fetchMainData() {
     });
     renderCalendar();
 }
+
+// --- 其餘功能與 iPhone 優化 ---
+function getShortName(n) { return n.length > 2 ? n.substring(n.length-2) : n; }
+function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
+function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
+function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
+
+async function checkLogin() {
+    setLoad(true);
+    try {
+        const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
+        if (data) {
+            currentUser = data;
+            document.getElementById('u-name').innerText = "夥伴, " + data.name;
+            if (currentUser.code === '555') { document.getElementById('t-adm').style.display = 'block'; document.getElementById('drv-admin-area').style.display = 'block'; }
+            document.getElementById('view-login').style.display = 'none';
+            document.getElementById('view-main').style.display = 'block';
+            await initApp();
+        } else { alert("錯誤"); currentCode = ""; window.pressKey('C'); }
+    } catch(e) { console.error(e); } finally { setLoad(false); }
+}
+
+async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
+
+window.submitStock = async function() {
+    const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
+    if(!o || !n) return alert("必填");
+    setLoad(true);
+    try {
+        let p = null;
+        if(f) {
+            const comp = await imageCompression(f, {maxSizeMB: 0.15, maxWidthOrHeight: 1024});
+            const fname = `stock/${Date.now()}.jpg`;
+            const { data, error } = await _sb.storage.from('photos').upload(fname, comp);
+            if(error) throw error; p = data.path;
+        }
+        await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:o, note:n, photo_path:p, status:'待處理'}]);
+        if(stModal) stModal.hide(); fetchStock(); alert("成功");
+    } catch(e) { alert("失敗"); } finally { setLoad(false); }
+};
+
+window.handleDone = async function(id, p) { if(!confirm("確定完成？")) return; setLoad(true); await _sb.from('stock_items').delete().eq('id', id); if(p && p !== 'null') await _sb.storage.from('photos').remove([p]); fetchStock(); setLoad(false); };
 
 function renderCalendar() {
     const grid = document.getElementById('cal-grid'); if(!grid) return; grid.innerHTML = '';
@@ -130,21 +132,15 @@ function renderCalendar() {
     }
 }
 
-// --- 工具函式 ---
-function getShortName(n) { return n.length > 2 ? n.substring(n.length-2) : n; }
-function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
-function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
-function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
-
 async function fetchStaffList() { const {data}=await _sb.from('staff').select('name').order('name'); const el = document.getElementById('st-owner'); if(el) el.innerHTML = data.map(s => `<option value="${s.name}">${s.name}</option>`).join(''); }
 async function fetchStock() {
     const { data } = await _sb.from('stock_items').select('*').eq('status','待處理').order('created_at',{ascending:false});
     const myPkgs = data?.filter(i => i.owner_name === (currentUser?currentUser.name:''));
-    if(document.getElementById('notif-banner')) document.getElementById('notif-banner').style.display = myPkgs?.length > 0 ? 'block' : 'none';
+    const bn = document.getElementById('notif-banner'); if(bn) bn.style.display = myPkgs?.length > 0 ? 'block' : 'none';
     const l = document.getElementById('stk-list'); if(l) l.innerHTML = data?.map(i => {
         const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : null;
         return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px;"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${getShortName(i.owner_name)}</div><div class="small text-muted">備註：${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">完成</button></div></div>`;
-    }).join('') || '<div class="p-4 text-center text-muted small">目前無包裹</div>';
+    }).join('') || '<div class="p-4 text-center text-muted small">無包裹</div>';
 }
 async function fetchDriveFiles() {
     const { data } = await _sb.storage.from('public_files').list('', {sortBy:{column:'created_at',order:'desc'}});
@@ -162,7 +158,7 @@ window.uploadToDrive = async function() {
     const { error } = await _sb.storage.from('public_files').upload(`${Date.now()}_${sn}`, f);
     if(!error) fetchDriveFiles(); else alert("失敗"); setLoad(false); 
 };
-window.deleteFile = async function(n) { if(!confirm("刪除？")) return; setLoad(true); await _sb.storage.from('public_files').remove([n]); fetchDriveFiles(); setLoad(false); };
+window.deleteFile = async function(n) { if(!confirm("確定刪除？")) return; setLoad(true); await _sb.storage.from('public_files').remove([n]); fetchDriveFiles(); setLoad(false); };
 
 window.uploadExcel = async function() {
     const f = document.getElementById('xl-file').files[0]; if(!f) return; setLoad(true);
