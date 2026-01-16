@@ -33,7 +33,7 @@
 </head>
 <body>
   <div id="loading"><div class="spinner-border text-danger"></div></div>
-  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 您有包裹通知，請點此查看</div>
+  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 您有他人幫忙入庫的商品，請點此查看</div>
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
     <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
@@ -50,16 +50,16 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 id="u-name" class="fw-bold mb-0">夥伴</h4>
         <div>
-            <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.openStockModal()">入庫拍攝</button>
-            <button class="btn btn-pink btn-sm ms-1" onclick="window.openInvModal()">建立庫存</button>
+            <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.openStockModal()">幫他人入庫</button>
+            <button class="btn btn-pink btn-sm ms-1" onclick="window.openInvModal()">幫自己入庫</button>
         </div>
     </div>
 
     <div class="nav-tabs-poya shadow-sm mb-3">
         <div id="t-ros" class="nav-item-poya active" onclick="window.switchTab('ros')">今日班表</div>
-        <div id="t-stk" class="nav-item-poya" onclick="window.switchTab('stk')">入庫管理</div>
-        <div id="t-inv" class="nav-item-poya" onclick="window.switchTab('inv')">部門查詢</div>
-        <div id="t-drv" class="nav-item-poya" onclick="window.switchTab('drv')">公務檔案</div>
+        <div id="t-stk" class="nav-item-poya" onclick="window.switchTab('stk')">入庫通知</div>
+        <div id="t-inv" class="nav-item-poya" onclick="window.switchTab('inv')">部門庫存</div>
+        <div id="t-drv" class="nav-item-poya" onclick="window.switchTab('drv')">檔期檔案</div>
         <div id="t-adm" class="nav-item-poya" style="display:none;" onclick="window.switchTab('adm')">管理員</div>
     </div>
 
@@ -110,7 +110,7 @@
   <div class="modal fade" id="stockModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
     <h5 class="fw-bold mb-4 text-center">包裹入庫</h5>
     <label class="small text-muted mb-1">部門負責人</label><select id="st-owner" class="form-select mb-3"></select>
-    <label class="small text-muted mb-1">備註</label><input type="text" id="st-note" class="form-control mb-3">
+    <label class="small text-muted mb-1">備註或箱號</label><input type="text" id="st-note" class="form-control mb-3">
     <input type="file" id="st-photo" class="form-control mb-4" accept="image/*">
     <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitStock()">送出通知</button>
   </div></div></div></div>
@@ -133,8 +133,8 @@
     <p class="small text-muted">庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
     <input type="number" id="adj-val" class="form-control text-center mb-3 mx-auto" style="width:100px" value="1">
     <div class="row g-2">
-        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加 (+)</button></div>
-        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回 (-)</button></div>
+        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加庫存 (+)</button></div>
+        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回貨架 (-)</button></div>
         <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">⚠️ 刪除此商品</button></div>
     </div>
   </div></div></div>
@@ -147,3 +147,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
