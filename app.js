@@ -5,7 +5,7 @@ const _sb = supabase.createClient(SB_URL, SB_KEY);
 const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志誠','E':'鄧雅惠','F':'莊嘉銘','N':'倪世宗','G':'蔡明峯','B':'黃郁涵','M':'張淑貞' };
 let currentUser = null, currentCode = "", selectedDate = new Date(), stModal = null, calMode = 'my', allMonthData = [];
 
-// --- 介面掛載 ---
+// --- 介面控制掛載 ---
 window.openStockModal = async function() {
     const el = document.getElementById('stockModal');
     if (!stModal && el) stModal = new bootstrap.Modal(el);
@@ -15,7 +15,8 @@ window.openStockModal = async function() {
 
 window.pressKey = function(val) {
     if (val === 'C') currentCode = ""; else if (currentCode.length < 3) currentCode += val;
-    document.getElementById('code-val').innerText = currentCode || "---";
+    const el = document.getElementById('code-val');
+    if (el) el.innerText = currentCode || "---";
     if (currentCode.length === 3) checkLogin();
 };
 
@@ -34,64 +35,18 @@ window.toggleCalMode = function(m) {
     renderCalendar(); 
 };
 
-// --- 核心邏輯：精準抓取當日第二列 ---
-async function fetchMainData() {
-    const ds = selectedDate.toISOString().split('T')[0];
-    document.getElementById('h-date').innerText = ds;
-    
-    const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
-    allMonthData = data || [];
-    
-    const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), noteEl = document.getElementById('v-note');
-    const dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
-
-    // 【1. 先暴力清除所有欄位】防止舊資料或隔天資料殘留
-    if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
-    if(noteEl) noteEl.innerText = "今日無事項";
-    if(dD) dD.innerText = "--"; if(dN) dN.innerText = "--";
-    
-    // 【2. 只針對當日日期進行嚴格過濾】
-    const todayData = allMonthData.filter(x => x.date === ds);
-    
-    todayData.forEach(r => {
-        const staffName = String(r.staff_name).trim();
-        const code = (r.shift_code === null || r.shift_code === undefined) ? "" : String(r.shift_code).trim();
-
-        // 判斷是否為「事項」(Excel 第二列資料)
-        if (staffName === "事項") {
-            if (code !== "" && code !== "null" && code !== "undefined") {
-                noteEl.innerText = code;
-            } else {
-                noteEl.innerText = "今日無事項";
-            }
-        } 
-        else if (staffName === "早班值日") { if(dD) dD.innerText = staffMap[code] || code || "--"; }
-        else if (staffName === "晚班值日") { if(dN) dN.innerText = staffMap[code] || code || "--"; }
-        else {
-            const s = parseShift(code);
-            if(s.isW) {
-                const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${staffName}</span><b>${s.disp}</b></div>`;
-                if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; }
-            }
-        }
-    });
-    renderCalendar();
-}
-
-// --- 其餘穩定功能 ---
-function getShortName(n) { return n.length > 2 ? n.substring(n.length-2) : n; }
-function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
-function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
-function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
-
+// --- 核心邏輯 ---
 async function checkLogin() {
     setLoad(true);
     try {
         const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
         if (data) {
             currentUser = data;
-            document.getElementById('u-name').innerText = "夥伴, " + data.name;
-            if (currentUser.code === '555') { document.getElementById('t-adm').style.display = 'block'; document.getElementById('drv-admin-area').style.display = 'block'; }
+            const uEl = document.getElementById('u-name'); if(uEl) uEl.innerText = "夥伴, " + data.name;
+            if (currentUser.code === '555') {
+                document.getElementById('t-adm').style.display = 'block';
+                document.getElementById('drv-admin-area').style.display = 'block';
+            }
             document.getElementById('view-login').style.display = 'none';
             document.getElementById('view-main').style.display = 'block';
             await initApp();
@@ -101,9 +56,10 @@ async function checkLogin() {
 
 async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
 
+// --- 入庫管理 (核心修正) ---
 window.submitStock = async function() {
     const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
-    if(!o || !n) return alert("收件人與備註必填");
+    if(!o || !n) return alert("請填寫負責人與位置備註");
     setLoad(true);
     try {
         let p = null;
@@ -114,12 +70,48 @@ window.submitStock = async function() {
             if(error) throw error; p = data.path;
         }
         await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:o, note:n, photo_path:p, status:'待處理'}]);
-        if(stModal) stModal.hide(); fetchStock(); alert("入庫成功");
+        if(stModal) stModal.hide(); fetchStock(); alert("通知已送出");
         document.getElementById('st-note').value = ""; document.getElementById('st-photo').value = "";
-    } catch(e) { alert("失敗"); } finally { setLoad(false); }
+    } catch(e) { alert("送出失敗"); } finally { setLoad(false); }
 };
 
 window.handleDone = async function(id, p) { if(!confirm("確定完成？")) return; setLoad(true); await _sb.from('stock_items').delete().eq('id', id); if(p && p !== 'null') await _sb.storage.from('photos').remove([p]); fetchStock(); setLoad(false); };
+
+// --- 檔案管理 ---
+window.uploadToDrive = async function() { 
+    const f = document.getElementById('up-drv-file').files[0]; if(!f) return;
+    setLoad(true); const sn = encodeURIComponent(f.name).replace(/%/g, '__');
+    const { error } = await _sb.storage.from('public_files').upload(`${Date.now()}_${sn}`, f);
+    if(!error) fetchDriveFiles(); else alert("失敗"); setLoad(false); 
+};
+window.deleteFile = async function(n) { if(!confirm("確定刪除？")) return; setLoad(true); await _sb.storage.from('public_files').remove([n]); fetchDriveFiles(); setLoad(false); };
+
+// --- 輔助邏輯 ---
+function getShortName(n) { const str = String(n||""); return str.length > 2 ? str.substring(str.length-2) : str; }
+function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
+function setLoad(s) { const el = document.getElementById('loading'); if(el) el.style.display = s ? 'flex' : 'none'; }
+function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
+
+async function fetchMainData() {
+    const ds = selectedDate.toISOString().split('T')[0];
+    document.getElementById('h-date').innerText = ds;
+    const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
+    allMonthData = data || [];
+    const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), noteEl = document.getElementById('v-note');
+    const dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
+    if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
+    if(noteEl) noteEl.innerText = "今日無事項";
+    if(dD) dD.innerText = "--"; if(dN) dN.innerText = "--";
+    const todayRows = allMonthData.filter(x => x.date === ds);
+    todayRows.forEach(r => {
+        const n = String(r.staff_name).trim(), c = r.shift_code ? String(r.shift_code).trim() : "";
+        if(n === "事項" && c !== "" && c !== "null") { if(noteEl) noteEl.innerText = c; }
+        else if(n === "早班值日") { if(dD) dD.innerText = staffMap[c] || c || "--"; }
+        else if(n === "晚班值日") { if(dN) dN.innerText = staffMap[c] || c || "--"; }
+        else { const s = parseShift(c); if(s.isW) { const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${n}</span><b>${s.disp}</b></div>`; if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; } } }
+    });
+    renderCalendar();
+}
 
 function renderCalendar() {
     const grid = document.getElementById('cal-grid'); if(!grid) return; grid.innerHTML = '';
@@ -159,14 +151,6 @@ async function fetchDriveFiles() {
         return `<div class="flat-card d-flex justify-content-between align-items-center mb-2"><span class="text-truncate small fw-bold" style="max-width:70%"><i class="far fa-file-pdf text-danger me-2"></i>${disp}</span><div><a href="${u}" target="_blank" class="btn btn-sm btn-outline-primary me-2">看</a>${del}</div></div>`;
     }).join('') || '無檔案';
 }
-
-window.uploadToDrive = async function() { 
-    const f = document.getElementById('up-drv-file').files[0]; if(!f) return;
-    setLoad(true); const sn = encodeURIComponent(f.name).replace(/%/g, '__');
-    const { error } = await _sb.storage.from('public_files').upload(`${Date.now()}_${sn}`, f);
-    if(!error) fetchDriveFiles(); else alert("失敗"); setLoad(false); 
-};
-window.deleteFile = async function(n) { if(!confirm("確定刪除？")) return; setLoad(true); await _sb.storage.from('public_files').remove([n]); fetchDriveFiles(); setLoad(false); };
 
 window.uploadExcel = async function() {
     const f = document.getElementById('xl-file').files[0]; if(!f) return; setLoad(true);
