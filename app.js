@@ -5,7 +5,7 @@ const _sb = supabase.createClient(SB_URL, SB_KEY);
 const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志誠','E':'鄧雅惠','F':'莊嘉銘','N':'倪世宗','G':'蔡明峯','B':'黃郁涵','M':'張淑貞' };
 let currentUser = null, currentCode = "", selectedDate = new Date(), stModal = null, calMode = 'my', allMonthData = [];
 
-// --- 掛載全域函式 ---
+// --- 介面掛載 ---
 window.openStockModal = async function() {
     const el = document.getElementById('stockModal');
     if (!stModal && el) stModal = new bootstrap.Modal(el);
@@ -15,8 +15,7 @@ window.openStockModal = async function() {
 
 window.pressKey = function(val) {
     if (val === 'C') currentCode = ""; else if (currentCode.length < 3) currentCode += val;
-    const el = document.getElementById('code-val');
-    if (el) el.innerText = currentCode || "---";
+    document.getElementById('code-val').innerText = currentCode || "---";
     if (currentCode.length === 3) checkLogin();
 };
 
@@ -35,18 +34,64 @@ window.toggleCalMode = function(m) {
     renderCalendar(); 
 };
 
-// --- 登入與初始化 ---
+// --- 核心邏輯：精準抓取當日第二列 ---
+async function fetchMainData() {
+    const ds = selectedDate.toISOString().split('T')[0];
+    document.getElementById('h-date').innerText = ds;
+    
+    const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
+    allMonthData = data || [];
+    
+    const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), noteEl = document.getElementById('v-note');
+    const dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
+
+    // 【1. 先暴力清除所有欄位】防止舊資料或隔天資料殘留
+    if(ld) ld.innerHTML = ''; if(ln) ln.innerHTML = '';
+    if(noteEl) noteEl.innerText = "今日無事項";
+    if(dD) dD.innerText = "--"; if(dN) dN.innerText = "--";
+    
+    // 【2. 只針對當日日期進行嚴格過濾】
+    const todayData = allMonthData.filter(x => x.date === ds);
+    
+    todayData.forEach(r => {
+        const staffName = String(r.staff_name).trim();
+        const code = (r.shift_code === null || r.shift_code === undefined) ? "" : String(r.shift_code).trim();
+
+        // 判斷是否為「事項」(Excel 第二列資料)
+        if (staffName === "事項") {
+            if (code !== "" && code !== "null" && code !== "undefined") {
+                noteEl.innerText = code;
+            } else {
+                noteEl.innerText = "今日無事項";
+            }
+        } 
+        else if (staffName === "早班值日") { if(dD) dD.innerText = staffMap[code] || code || "--"; }
+        else if (staffName === "晚班值日") { if(dN) dN.innerText = staffMap[code] || code || "--"; }
+        else {
+            const s = parseShift(code);
+            if(s.isW) {
+                const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${staffName}</span><b>${s.disp}</b></div>`;
+                if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; }
+            }
+        }
+    });
+    renderCalendar();
+}
+
+// --- 其餘穩定功能 ---
+function getShortName(n) { return n.length > 2 ? n.substring(n.length-2) : n; }
+function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
+function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
+function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
+
 async function checkLogin() {
     setLoad(true);
     try {
         const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
         if (data) {
             currentUser = data;
-            const uEl = document.getElementById('u-name'); if(uEl) uEl.innerText = "夥伴, " + data.name;
-            if (currentUser.code === '555') {
-                document.getElementById('t-adm').style.display = 'block';
-                document.getElementById('drv-admin-area').style.display = 'block';
-            }
+            document.getElementById('u-name').innerText = "夥伴, " + data.name;
+            if (currentUser.code === '555') { document.getElementById('t-adm').style.display = 'block'; document.getElementById('drv-admin-area').style.display = 'block'; }
             document.getElementById('view-login').style.display = 'none';
             document.getElementById('view-main').style.display = 'block';
             await initApp();
@@ -56,71 +101,21 @@ async function checkLogin() {
 
 async function initApp() { await Promise.all([fetchMainData(), fetchStaffList(), fetchStock(), fetchDriveFiles()]); }
 
-// --- 資料抓取與「事項」精確修正 ---
-async function fetchMainData() {
-    const ds = selectedDate.toISOString().split('T')[0];
-    document.getElementById('h-date').innerText = ds;
-    
-    // 抓取當月份資料
-    const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31');
-    allMonthData = data || [];
-    
-    const ld = document.getElementById('l-day'), ln = document.getElementById('l-night'), noteEl = document.getElementById('v-note');
-    const dD = document.getElementById('v-dD'), dN = document.getElementById('v-dN');
-
-    // 【1. 暴力初始化】切換日期時，先強行重置所有畫面內容，避免舊資料殘留
-    if(ld) ld.innerHTML = ''; 
-    if(ln) ln.innerHTML = '';
-    if(noteEl) noteEl.innerText = "今日無事項";
-    if(dD) dD.innerText = "--";
-    if(dN) dN.innerText = "--";
-    
-    // 【2. 精確篩選】只過濾出「當天」的資料
-    const todayRows = allMonthData.filter(x => x.date === ds);
-    
-    todayRows.forEach(r => {
-        const n = String(r.staff_name).trim();
-        const c = (r.shift_code === null || r.shift_code === undefined) ? "" : String(r.shift_code).trim();
-
-        if(n === "事項") {
-            // 只有當天真的有內容時才覆蓋
-            if(noteEl && c !== "" && c !== "null" && c !== "undefined") {
-                noteEl.innerText = c;
-            }
-        }
-        else if(n === "早班值日") { if(dD) dD.innerText = staffMap[c] || c || "--"; }
-        else if(n === "晚班值日") { if(dN) dN.innerText = staffMap[c] || c || "--"; }
-        else {
-            const s = parseShift(c);
-            if(s.isW) {
-                const h = `<div class="d-flex justify-content-between border-bottom py-1"><span>${n}</span><b>${s.disp}</b></div>`;
-                if(s.type === 'day') { if(ld) ld.innerHTML += h; } else { if(ln) ln.innerHTML += h; }
-            }
-        }
-    });
-    renderCalendar();
-}
-
-// --- 其餘功能與 iPhone 優化 ---
-function getShortName(n) { return n.length > 2 ? n.substring(n.length-2) : n; }
-function parseShift(c) { c = String(c||'').trim().toUpperCase(); if(!c || ['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m = {'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
-function setLoad(s) { document.getElementById('loading').style.display = s ? 'flex' : 'none'; }
-function formatExcelDate(v) { let d = (typeof v === 'number') ? new Date(Math.round((v - 25569) * 86400 * 1000)) : new Date(v); return d.toISOString().split('T')[0]; }
-
 window.submitStock = async function() {
     const o = document.getElementById('st-owner').value, n = document.getElementById('st-note').value, f = document.getElementById('st-photo').files[0];
-    if(!o || !n) return alert("必填項目未完成");
+    if(!o || !n) return alert("收件人與備註必填");
     setLoad(true);
     try {
         let p = null;
         if(f) {
-            const comp = await imageCompression(f, {maxSizeMB: 0.15});
+            const comp = await imageCompression(f, {maxSizeMB: 0.15, maxWidthOrHeight: 1024});
             const fname = `stock/${Date.now()}.jpg`;
             const { data, error } = await _sb.storage.from('photos').upload(fname, comp);
             if(error) throw error; p = data.path;
         }
         await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:o, note:n, photo_path:p, status:'待處理'}]);
-        if(stModal) stModal.hide(); fetchStock(); alert("成功");
+        if(stModal) stModal.hide(); fetchStock(); alert("入庫成功");
+        document.getElementById('st-note').value = ""; document.getElementById('st-photo').value = "";
     } catch(e) { alert("失敗"); } finally { setLoad(false); }
 };
 
