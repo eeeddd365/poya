@@ -41,53 +41,25 @@ window.openStockModal = async function() {
     stM.show();
 };
 
-// --- 掃描功能 ---
-window.startInvScan = () => window.startScanner("i-reader", "i-barcode");
-window.startSearchScan = () => window.startScanner("q-reader", "q-barcode", true);
-
-window.startScanner = function(divId, inputId, autoSearch = false) {
-    document.getElementById(divId).style.display = 'block';
-    html5QrCode = new Html5Qrcode(divId);
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
-        document.getElementById(inputId).value = text;
-        window.stopScan();
-        if(autoSearch) window.searchInventory();
-    }).catch(() => alert("相機啟動失敗"));
-};
-
-window.stopScan = function() {
-    if(html5QrCode) {
-        html5QrCode.stop().then(() => {
-            document.querySelectorAll('.reader-box').forEach(el => el.style.display = 'none');
-            html5QrCode = null;
-        });
-    }
-};
-
-// --- 倉庫庫存業務 ---
+// --- 庫存業務 ---
 window.searchInventory = function() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async () => {
-        const d = document.getElementById('q-dept').value;
-        const b = document.getElementById('q-barcode').value;
+        const d = document.getElementById('q-dept').value, b = document.getElementById('q-barcode').value;
         if(!d && !b) { document.getElementById('inv-results').innerHTML = ""; return; }
-        
+        setLoad(true);
         let qry = _sb.from('inventory').select('*');
         if(d) qry = qry.eq('dept', d);
         if(b) qry = qry.ilike('barcode', `%${b}%`);
-
         const { data } = await qry.order('created_at', {ascending: false});
         const res = document.getElementById('inv-results');
         res.innerHTML = data?.map(i => {
             const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : '';
             return `<div class="flat-card d-flex align-items-center gap-3" onclick="window.openAdjust('${i.id}','${i.item_name}',${i.qty},'${u}','${i.note || ''}')">
                 <img src="${u || 'https://via.placeholder.com/60'}" class="inventory-img">
-                <div class="flex-grow-1">
-                    <div class="fw-bold">${i.item_name}</div>
-                    <div class="small text-muted">條碼: ${i.barcode} | 庫存: <b class="text-danger">${i.qty}</b></div>
-                    <div class="small text-secondary">備註: ${i.note || '無'}</div>
-                </div><i class="fas fa-edit text-muted"></i></div>`;
+                <div class="flex-grow-1"><div class="fw-bold">${i.item_name}</div><div class="small text-muted">條碼: ${i.barcode} | 庫存: <b class="text-danger">${i.qty}</b></div><div class="small text-secondary">備註: ${i.note || '無'}</div></div><i class="fas fa-edit text-muted"></i></div>`;
         }).join('') || '<div class="text-center p-4 small">查無資料</div>';
+        setLoad(false);
     }, 300);
 };
 
@@ -101,12 +73,23 @@ window.openAdjust = function(id, name, qty, imgUrl, note) {
     adjM.show();
 };
 
+// 【關鍵優化：獨立儲存備註】
+window.saveNoteOnly = async function() {
+    const newNote = document.getElementById('adj-note').value;
+    setLoad(true);
+    const { error } = await _sb.from('inventory').update({ note: newNote }).eq('id', curAdjId);
+    if(!error) {
+        alert("備註已更新");
+        adjM.hide(); window.searchInventory();
+    } else alert("更新失敗");
+    setLoad(false);
+};
+
 window.adjustInventory = async function(type) {
     const v = parseInt(document.getElementById('adj-val').value) || 1;
     const newNote = document.getElementById('adj-note').value;
     const newQ = (type==='add') ? curAdjQty + v : curAdjQty - v;
-    if(newQ < 0) { alert("數量不足！"); return; }
-    
+    if(newQ < 0) return alert("庫存不足！");
     setLoad(true);
     await _sb.from('inventory').update({ qty: newQ, note: newNote }).eq('id', curAdjId);
     adjM.hide(); window.searchInventory(); setLoad(false);
@@ -119,31 +102,28 @@ window.deleteInventory = async function() {
     adjM.hide(); window.searchInventory(); setLoad(false);
 };
 
-// --- 日曆渲染邏輯修復 ---
+// --- 日曆渲染 (修正個人/全店判定) ---
 function renderCalendar() {
     const grid = document.getElementById('cal-grid'); if(!grid) return;
     grid.innerHTML = '';
     const year = selectedDate.getFullYear(), month = selectedDate.getMonth(), days = new Date(year, month+1, 0).getDate(), dsT = new Date().toISOString().split('T')[0];
-    
     for(let d=1; d<=days; d++) {
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const dayData = allMonthData.filter(x => x.date === dateStr);
         let html = `<div class="cal-cell ${dateStr === dsT ? 'cal-is-today' : ''}"><div class="cal-date">${d}</div>`;
-        
         if (calMode === 'my' && currentUser) {
-            // 個人模式：只過濾出自己的班
-            const mine = dayData.find(x => x.staff_name === currentUser.name);
+            const mine = dayData.find(x => String(x.staff_name).trim() === String(currentUser.name).trim());
             if(mine) {
                 const s = parseShift(mine.shift_code);
-                html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'} mt-2" style="font-size:1.1rem !important; width:100%">${s.disp}</div>`;
+                html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'} mt-2" style="font-size:1rem !important; width:100%">${s.disp}</div>`;
             }
         } else {
-            // 全店模式：顯示所有人的縮圖
             html += `<div class="staff-tag-group">`;
             dayData.forEach(x => {
-                if(!["事項","早班值日","晚班值日"].includes(x.staff_name)) {
+                const sName = String(x.staff_name).trim();
+                if(!["事項","早班值日","晚班值日"].includes(sName)) {
                     const s = parseShift(x.shift_code);
-                    if(s.isW) html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'}">${n2(x.staff_name)}:${s.disp.substring(0,1)}</div>`;
+                    if(s.isW) html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'}">${n2(sName)}:${s.disp.substring(0,1)}</div>`;
                 }
             });
             html += `</div>`;
@@ -167,7 +147,6 @@ async function checkLogin() {
     setLoad(false);
 }
 async function initApp() { await Promise.all([fetchMainData(), fetchStock()]); }
-
 async function fetchMainData() {
     const ds = selectedDate.toISOString().split('T')[0];
     document.getElementById('h-date').innerText = ds;
@@ -189,33 +168,38 @@ async function fetchMainData() {
     });
     renderCalendar();
 }
-
+window.startInvScan = () => window.startScanner("i-reader", "i-barcode");
+window.startSearchScan = () => window.startScanner("q-reader", "q-barcode", true);
+window.startScanner = function(divId, inputId, autoSearch = false) {
+    document.getElementById(divId).style.display = 'block';
+    html5QrCode = new Html5Qrcode(divId);
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+        document.getElementById(inputId).value = text;
+        window.stopScan();
+        if(autoSearch) window.searchInventory();
+    }).catch(() => alert("相機啟動失敗"));
+};
+window.stopScan = function() { if(html5QrCode) { html5QrCode.stop().then(() => { document.querySelectorAll('.reader-box').forEach(el => el.style.display = 'none'); html5QrCode = null; }); } };
 window.submitInventory = async function() {
     const d=document.getElementById('i-dept').value, b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').value, q=document.getElementById('i-qty').value, nt=document.getElementById('i-note').value, f=document.getElementById('i-photo').files[0], nWho=document.getElementById('i-notify-who').value;
-    if(!d||!b||!n||!q) return alert("必填未填");
-    setLoad(true);
-    try {
-        let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.1}); const {data}=await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp); p=data.path; }
-        await _sb.from('inventory').insert([{dept:d, barcode:b, item_name:n, qty:parseInt(q), note:nt, photo_path:p, creator:currentUser.name}]);
-        if(nWho) { await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:nWho, note:`入倉通知: ${n} (${q}件)`, photo_path:p, status:'待處理'}]); }
-        invM.hide(); alert("入倉完成");
-    } catch(e){ alert("失敗"); } finally { setLoad(false); }
+    if(!d||!b||!n||!q) return alert("必填未填"); setLoad(true);
+    try { let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.1}); const {data}=await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp); p=data.path; }
+    await _sb.from('inventory').insert([{dept:d, barcode:b, item_name:n, qty:parseInt(q), note:nt, photo_path:p, creator:currentUser.name}]);
+    if(nWho) await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:nWho, note:`入倉通知: ${n} (${q}件)`, photo_path:p, status:'待處理'}]);
+    invM.hide(); alert("入倉完成"); } catch(e){alert("失敗");} finally {setLoad(false);}
 };
-
 window.submitStock = async function() {
     const o=document.getElementById('st-owner').value, n=document.getElementById('st-note').value, f=document.getElementById('st-photo').files[0];
     if(!o||!n) return alert("必填項目未完成"); setLoad(true);
     try { let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.15}); const {data}=await _sb.storage.from('photos').upload(`stock/${Date.now()}.jpg`, comp); p=data.path; }
     await _sb.from('stock_items').insert([{sender_name:currentUser.name,owner_name:o,note:n,photo_path:p,status:'待處理'}]); stM.hide(); fetchStock(); alert("通知已送出"); } catch(e){alert("失敗");} finally {setLoad(false);}
 };
-
-// --- 通用輔助 ---
 function parseShift(c){ c=String(c||'').trim().toUpperCase(); if(!c||['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m={'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
 function n2(n){ const s=String(n||""); return s.length>2?s.substring(s.length-2):s; }
 function setLoad(s){ document.getElementById('loading').style.display=s?'flex':'none'; }
 window.changeDate = function(n){ selectedDate.setDate(selectedDate.getDate()+n); fetchMainData(); };
 async function fetchStaffList(id) { const {data}=await _sb.from('staff').select('name').order('name'); document.getElementById(id).innerHTML='<option value="">--不通知--</option>'+data.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''); }
-async function fetchStock(){ const {data}=await _sb.from('stock_items').select('*').eq('status','待處理').order('created_at',{ascending:false}); const myPkgs=data?.filter(i=>i.owner_name===(currentUser?currentUser.name:'')); if(document.getElementById('notif-banner'))document.getElementById('notif-banner').style.display=myPkgs?.length>0?'block':'none'; document.getElementById('stk-list').innerHTML=data?.map(i=>{ const u=i.photo_path?_sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl:null; return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${i.owner_name}</div><div class="small text-muted">備註: ${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">完成</button></div></div>`; }).join('')||'無通知'; }
+async function fetchStock(){ const {data}=await _sb.from('stock_items').select('*').eq('status','待處理').order('created_at',{ascending:false}); const myPkgs=data?.filter(i=>i.owner_name===(currentUser?currentUser.name:'')); if(document.getElementById('notif-banner'))document.getElementById('notif-banner').style.display=myPkgs?.length>0?'block':'none'; document.getElementById('stk-list').innerHTML=data?.map(i=>{ const u=i.photo_path?_sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl:null; return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${i.owner_name}</div><div class="small text-muted">備註: ${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">領取完成</button></div></div>`; }).join('')||'無通知'; }
 window.handleDone=async function(id,p){ if(!confirm("完成？"))return; setLoad(true); await _sb.from('stock_items').delete().eq('id',id); if(p&&p!=='null') await _sb.storage.from('photos').remove([p]); fetchStock(); setLoad(false); };
 window.uploadToDrive = async function() { const f = document.getElementById('up-drv-file').files[0]; if(!f) return; setLoad(true); const sn = encodeURIComponent(f.name).replace(/%/g, '__'); await _sb.storage.from('public_files').upload(`${Date.now()}_${sn}`, f); fetchDriveFiles(); setLoad(false); };
 window.deleteFile = async function(n) { if(!confirm("刪除？")) return; setLoad(true); await _sb.storage.from('public_files').remove([n]); fetchDriveFiles(); setLoad(false); };
