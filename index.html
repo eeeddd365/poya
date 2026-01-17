@@ -69,7 +69,7 @@
         <div id="t-ros" class="nav-item-poya active" onclick="window.switchTab('ros')">今日班表</div>
         <div id="t-stk" class="nav-item-poya" onclick="window.switchTab('stk')">入庫管理</div>
         <div id="t-inv" class="nav-item-poya" onclick="window.switchTab('inv')">倉庫查詢</div>
-        <div id="t-drv" class="nav-item-poya" onclick="window.switchTab('drv')">公務檔案</div>
+        <div id="t-drv" class="nav-item-poya" onclick="window.switchTab('drv')">檔期檔案</div>
         <div id="t-adm" class="nav-item-poya" style="display:none;" onclick="window.switchTab('adm')">管理員</div>
     </div>
 
@@ -89,8 +89,8 @@
             <div class="col-6"><div class="flat-card h-100 p-2"><b>晚班戰力</b><hr class="my-1"><div id="l-night"></div></div></div>
         </div>
         <div class="btn-group w-100 mb-2 p-1 bg-white rounded-pill shadow-sm">
-            <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="window.toggleCalMode('my')">個人模式</button>
-            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店縮圖</button>
+            <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="window.toggleCalMode('my')">個人班表</button>
+            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店班表</button>
         </div>
         <div id="cal-grid" class="calendar-container"></div>
     </div>
@@ -157,8 +157,8 @@
     </div>
     
     <div class="row g-2">
-        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加 (+)</button></div>
-        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回 (-)</button></div>
+        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加庫存 (+)</button></div>
+        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回架上 (-)</button></div>
         <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">⚠️ 徹底刪除紀錄</button></div>
     </div>
   </div></div></div>
@@ -172,3 +172,4 @@
   <script>function adjStep(n){ const i=document.getElementById('adj-val'); i.value=Math.max(1,parseInt(i.value)+n); }</script>
 </body>
 </html>
+
