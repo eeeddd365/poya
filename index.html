@@ -42,7 +42,7 @@
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
     <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
-    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700;">---</div>
+    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700; letter-spacing: 8px;">---</div>
     <div class="keypad d-grid" style="grid-template-columns: repeat(3, 1fr); gap: 15px;">
       <div class="key" onclick="window.pressKey('1')">1</div><div class="key" onclick="window.pressKey('2')">2</div><div class="key" onclick="window.pressKey('3')">3</div>
       <div class="key" onclick="window.pressKey('4')">4</div><div class="key" onclick="window.pressKey('5')">5</div><div class="key" onclick="window.pressKey('6')">6</div>
@@ -96,8 +96,8 @@
             <div class="col-6"><div class="flat-card h-100 p-2"><b>晚班</b><hr class="my-1"><div id="l-night"></div></div></div>
         </div>
         <div class="btn-group w-100 mb-2 p-1 bg-white rounded-pill shadow-sm">
-            <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="window.toggleCalMode('my')">個人模式</button>
-            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店模式</button>
+            <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="window.toggleCalMode('my')">個人大字</button>
+            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店縮圖</button>
         </div>
         <div id="cal-grid" class="calendar-container"></div>
     </div>
@@ -119,7 +119,7 @@
     <label class="small text-muted">6. 選擇照片</label><input type="file" id="i-photo" class="form-control mb-2" accept="image/*">
     <hr>
     <label class="small fw-bold text-primary mb-1">通知對方領取 (可不選)</label>
-    <select id="i-notify-who" class="form-select mb-3 shadow-sm border-primary"></select>
+    <select id="i-notify-who" class="form-select mb-3 border-primary"></select>
     <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitInventory()">確認入倉</button>
   </div></div></div></div>
 
@@ -134,16 +134,20 @@
   <div class="modal fade" id="adjustModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center">
     <div id="adj-img-container" class="mb-3"></div>
     <h6 id="adj-title" class="fw-bold mb-1"></h6>
-    <p class="small text-muted">當前庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
-    <input type="number" id="adj-val" class="form-control text-center mb-3 mx-auto" style="width:100px" value="1">
+    <p class="small text-muted">庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
+    <div class="input-group mb-4 w-50 mx-auto">
+        <button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button>
+        <input type="number" id="adj-val" class="form-control text-center" value="1">
+        <button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button>
+    </div>
     
     <label class="small text-muted d-block mb-1">編輯位置備註</label>
-    <input type="text" id="adj-note" class="form-control mb-3 text-center">
+    <input type="text" id="adj-note" class="form-control mb-3 text-center" placeholder="輸入新的存放位置...">
 
     <div class="row g-2">
-        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加進貨 (+)</button></div>
-        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回貨架 (-)</button></div>
-        <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">⚠️ 徹底刪除紀錄</button></div>
+        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加存檔 (+)</button></div>
+        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回存檔 (-)</button></div>
+        <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">徹底刪除紀錄</button></div>
     </div>
   </div></div></div>
 
