@@ -1,194 +1,347 @@
 <!DOCTYPE html>
+
 <html lang="zh-TW">
+
 <head>
+
   <meta charset="utf-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+
   <title>POYA 北屯東山二系統</title>
+
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
   <style>
+
     :root { --poya-pink: #ec008c; --poya-gradient: linear-gradient(135deg, #ec008c 0%, #ff66b2 100%); --poya-bg: #fdf2f8; }
+
     body { background-color: var(--poya-bg); font-family: 'Noto Sans TC', sans-serif; color: #333; padding-bottom: 80px; overflow-x: hidden; }
+
     #loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; }
+
     
+
     /* 選單置中 */
+
     .nav-tabs-poya { display: flex; justify-content: center; background: white; border-radius: 15px; padding: 5px; margin: 15px 0; overflow-x: auto; scrollbar-width: none; }
+
     .nav-tabs-poya::-webkit-scrollbar { display: none; }
+
     .nav-item-poya { flex: 0 0 auto; text-align: center; padding: 10px 15px; border-radius: 12px; color: #999; font-size: 0.85rem; cursor: pointer; }
+
     .nav-item-poya.active { background: var(--poya-gradient); color: white; font-weight: bold; }
 
-    /* 班表顏色：早紅晚藍 */
+
+
     .s-O { background-color: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; } 
+
     .s-X { background-color: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+
     .flat-card { background: white; border-radius: 20px; margin-bottom: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+
     .duty-box-day { background: linear-gradient(135deg, #f5222d 0%, #ff7875 100%); color: white; border-radius: 18px; padding: 12px; }
+
     .duty-box-night { background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%); color: white; border-radius: 18px; padding: 12px; }
+
     
+
     .calendar-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #f0f0f0; padding: 3px; border-radius: 12px; margin-top: 10px; }
+
     .cal-cell { background: white; border-radius: 6px; padding: 2px; text-align: center; min-height: 105px; display: flex; flex-direction: column; }
+
     .cal-date { font-weight: 700; color: #bbb; font-size: 0.7rem; border-bottom: 1px solid #f9f9f9; }
+
     .cal-is-today { border: 2.5px solid var(--poya-pink) !important; background: #fff0f6 !important; }
+
     .staff-tag-group { display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; align-content: flex-start; flex-grow: 1; margin-top: 2px; }
+
     .staff-tag-full { padding: 1px 2px; border-radius: 3px; font-weight: 700; font-size: 0.6rem !important; line-height: 1; white-space: nowrap; transform: scale(0.85); }
 
+
+
     .inventory-img { width: 65px; height: 65px; object-fit: cover; border-radius: 12px; border: 1px solid #eee; }
+
     .reader-box { width: 100%; border-radius: 15px; overflow: hidden; display: none; margin-bottom: 10px; border: 2px solid var(--poya-pink); }
+
     .key { background: white; border-radius: 18px; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; }
+
     #notif-banner { display: none; background: var(--poya-gradient); color: white; padding: 12px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; cursor: pointer; }
+
     
+
     /* 修正儲存按鈕樣式 */
+
     .btn-save-note { background-color: #333; color: white; border: none; border-radius: 8px; padding: 0 15px; font-weight: bold; }
+
     .btn-save-note:active { background-color: #000; }
-    .loc-tag { background: #fdf2f8; color: #ec008c; padding: 4px 12px; border-radius: 50px; font-weight: bold; font-size: 0.9rem; display: inline-block; }
+
   </style>
+
 </head>
+
 <body>
+
   <div id="loading"><div class="spinner-border text-danger"></div></div>
-  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 您有新的貨物通知，請查看</div>
+
+  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 有貨物入庫通知，請點此查看</div>
+
+
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+
     <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
-    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700; letter-spacing: 8px;">---</div>
+
+    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700;">---</div>
+
     <div class="keypad d-grid" style="grid-template-columns: repeat(3, 1fr); gap: 15px;">
+
       <div class="key" onclick="window.pressKey('1')">1</div><div class="key" onclick="window.pressKey('2')">2</div><div class="key" onclick="window.pressKey('3')">3</div>
+
       <div class="key" onclick="window.pressKey('4')">4</div><div class="key" onclick="window.pressKey('5')">5</div><div class="key" onclick="window.pressKey('6')">6</div>
+
       <div class="key" onclick="window.pressKey('7')">7</div><div class="key" onclick="window.pressKey('8')">8</div><div class="key" onclick="window.pressKey('9')">9</div>
+
       <div style="visibility:hidden"></div><div class="key" onclick="window.pressKey('0')">0</div><div class="key text-danger" onclick="window.pressKey('C')"><i class="fas fa-backspace"></i></div>
+
     </div>
+
   </div>
 
+
+
   <div id="view-main" style="display:none;" class="container py-3">
+
     <div class="d-flex justify-content-between align-items-center mb-3 px-1">
+
         <h4 id="u-name" class="fw-bold mb-0">夥伴</h4>
+
         <div>
+
             <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.openStockModal()">幫人入庫</button>
+
             <button class="btn btn-pink btn-sm ms-1" onclick="window.openInvModal()">入倉</button>
+
         </div>
+
     </div>
+
+
 
     <div class="nav-tabs-poya shadow-sm mb-3">
+
         <div id="t-ros" class="nav-item-poya active" onclick="window.switchTab('ros')">今日班表</div>
+
         <div id="t-stk" class="nav-item-poya" onclick="window.switchTab('stk')">入庫管理</div>
-        <div id="t-loc" class="nav-item-poya" onclick="window.switchTab('loc')">位置查詢</div>
+
         <div id="t-inv" class="nav-item-poya" onclick="window.switchTab('inv')">倉庫查詢</div>
+
         <div id="t-drv" class="nav-item-poya" onclick="window.switchTab('drv')">檔期檔案</div>
+
         <div id="t-adm" class="nav-item-poya" style="display:none;" onclick="window.switchTab('adm')">管理員</div>
+
     </div>
 
-    <div id="v-loc" style="display:none;">
-        <div class="flat-card text-center">
-            <h6 class="fw-bold mb-3">商品貨架位置</h6>
-            <div id="loc-reader" class="reader-box"></div>
-            <button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill" onclick="window.startLocScan()"><i class="fas fa-barcode"></i> 掃描條碼查詢</button>
-            <input type="text" id="loc-search-barcode" class="form-control rounded-pill text-center" placeholder="手動輸入條碼" oninput="window.searchLocation()">
-        </div>
-        <div id="loc-result-area"></div>
-    </div>
+
 
     <div id="v-ros">
+
         <div class="flat-card py-2 mb-2 text-center" style="background:#fffbe6;"><small id="v-note" class="fw-bold text-warning">今日無事項</small></div>
+
         <div class="duty-card shadow-sm mb-3 rounded-4 bg-white p-3"><div class="row g-2">
+
             <div class="col-6"><div class="duty-box-day text-center"><div class="small">早班值日</div><div id="v-dD" class="fw-bold fs-4">--</div></div></div>
+
             <div class="col-6"><div class="duty-box-night text-center"><div class="small">晚班值日</div><div id="v-dN" class="fw-bold fs-4">--</div></div></div>
+
         </div></div>
-        <div class="d-flex justify-content-between mb-2">
+
+        <div class="d-flex justify-content-between mb-2 px-1">
+
             <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(-1)">前一天</button>
+
             <span id="h-date" class="fw-bold small pt-1"></span>
+
             <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(1)">後一天</button>
+
         </div>
+
         <div class="row g-2 mb-3">
-            <div class="col-6"><div class="flat-card h-100 p-2"><b>早班人員</b><hr class="my-1"><div id="l-day"></div></div></div>
-            <div class="col-6"><div class="flat-card h-100 p-2"><b>晚班人員</b><hr class="my-1"><div id="l-night"></div></div></div>
+
+            <div class="col-6"><div class="flat-card h-100 p-2"><b>早班戰力</b><hr class="my-1"><div id="l-day"></div></div></div>
+
+            <div class="col-6"><div class="flat-card h-100 p-2"><b>晚班戰力</b><hr class="my-1"><div id="l-night"></div></div></div>
+
         </div>
+
         <div class="btn-group w-100 mb-2 p-1 bg-white rounded-pill shadow-sm">
+
             <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="window.toggleCalMode('my')">個人班表</button>
-            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店縮圖</button>
+
+            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店班表</button>
+
         </div>
+
         <div id="cal-grid" class="calendar-container"></div>
+
     </div>
+
+
 
     <div id="v-stk" style="display:none;"><div id="stk-list"></div></div>
 
+    
+
     <div id="v-inv" style="display:none;">
+
         <div class="flat-card">
+
             <div id="q-reader" class="reader-box"></div>
-            <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill" onclick="window.startSearchScan()"><i class="fas fa-camera"></i> 掃描搜尋</button>
-            <select id="q-dept" class="form-select mb-2 rounded-pill" onchange="window.searchInventory()">
-                <option value="">所有部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option>
-            </select>
+
+            <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill" onclick="window.startSearchScan()"><i class="fas fa-camera me-1"></i> 掃描條碼</button>
+
+            <select id="q-dept" class="form-select mb-2 rounded-pill" onchange="window.searchInventory()"><option value="">所有部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option></select>
+
             <input type="text" id="q-barcode" class="form-control rounded-pill" placeholder="輸入條碼搜尋..." oninput="window.searchInventory()">
+
         </div>
+
         <div id="inv-results"></div>
+
     </div>
+
+
 
     <div id="v-drv" style="display:none;">
+
         <div id="drv-admin-area" style="display:none;" class="flat-card mb-3 text-center"><h6>上傳公務檔案</h6><input type="file" id="up-drv-file" class="form-control mb-2 rounded-pill"><button class="btn btn-pink w-100 btn-sm rounded-pill" onclick="window.uploadToDrive()">上傳</button></div>
+
         <div id="drv-list"></div>
+
     </div>
+
+    
+
     <div id="v-adm" style="display:none;"><div class="flat-card"><h6>同步 Excel 班表</h6><input type="file" id="xl-file" class="form-control mb-2 rounded-pill"><button class="btn btn-pink w-100" onclick="window.uploadExcel()">開始同步</button></div></div>
+
   </div>
 
-  <div class="modal fade" id="locModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center">
-    <h5 class="fw-bold mb-3">編輯位置 (8位代碼)</h5>
-    <p class="small text-muted" id="edit-loc-barcode"></p>
-    <input type="number" id="loc-code-input" class="form-control form-control-lg text-center mb-2" placeholder="04010101">
-    <div id="loc-preview" class="mb-4 small text-primary fw-bold"></div>
-    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.saveLocation()">儲存位置</button>
-  </div></div></div></div>
 
-  <div class="modal fade" id="adjustModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center">
-    <div id="adj-img-container" class="mb-3"></div>
-    <h6 id="adj-title" class="fw-bold mb-1"></h6>
-    <p class="small text-muted">目前庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
-    
-    <div class="bg-light p-2 rounded-3 mb-3 text-start">
-        <label class="small text-muted mb-1">存放位置/代碼</label>
-        <div class="input-group">
-            <input type="text" id="adj-note" class="form-control text-center">
-            <button class="btn btn-save-note" type="button" onclick="window.saveNoteOnly()">儲存</button>
-        </div>
-    </div>
-
-    <div class="input-group mb-4 w-50 mx-auto">
-        <button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button>
-        <input type="number" id="adj-val" class="form-control text-center" value="1">
-        <button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button>
-    </div>
-    <div class="row g-2">
-        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加 (+)</button></div>
-        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回 (-)</button></div>
-        <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">⚠️ 徹底刪除紀錄</button></div>
-    </div>
-  </div></div></div>
-
-  <div class="modal fade" id="invModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
-    <h5 class="fw-bold mb-3 text-center">入倉作業</h5>
-    <div id="i-reader" class="reader-box"></div>
-    <button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill" onclick="window.startInvScan()"><i class="fas fa-barcode"></i> 啟動條碼掃描</button>
-    <select id="i-dept" class="form-select mb-2"><option value="">選擇部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option></select>
-    <input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼">
-    <input type="text" id="i-name" class="form-control mb-2" placeholder="品名">
-    <input type="number" id="i-qty" class="form-control mb-2" placeholder="數量">
-    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置代碼 (8位)">
-    <input type="file" id="i-photo" class="form-control mb-2" accept="image/*">
-    <label class="small fw-bold text-primary">通知領取夥伴</label><select id="i-notify-who" class="form-select mb-3 border-primary"></select>
-    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitInventory()">確認入倉</button>
-  </div></div></div></div>
 
   <div class="modal fade" id="stockModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
+
     <h5 class="fw-bold mb-4 text-center">幫人入庫</h5>
+
     <label class="small text-muted">負責夥伴</label><select id="st-owner" class="form-select mb-3"></select>
+
     <label class="small text-muted">備註/位置</label><input type="text" id="st-note" class="form-control mb-3">
+
     <input type="file" id="st-photo" class="form-control mb-4" accept="image/*">
+
     <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitStock()">送出通知</button>
+
   </div></div></div></div>
 
+
+
+  <div class="modal fade" id="invModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
+
+    <h5 class="fw-bold mb-3 text-center">入倉作業</h5>
+
+    <div id="i-reader" class="reader-box"></div>
+
+    <button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill" onclick="window.startInvScan()"><i class="fas fa-barcode"></i> 啟動掃描器</button>
+
+    <select id="i-dept" class="form-select mb-2"><option value="">選擇部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option></select>
+
+    <input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼">
+
+    <input type="text" id="i-name" class="form-control mb-2" placeholder="品名">
+
+    <input type="number" id="i-qty" class="form-control mb-2" placeholder="數量">
+
+    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置備註">
+
+    <input type="file" id="i-photo" class="form-control mb-2" accept="image/*">
+
+    <label class="small fw-bold text-primary mb-1">通知夥伴領取</label><select id="i-notify-who" class="form-select mb-3 border-primary"></select>
+
+    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitInventory()">確認入倉</button>
+
+  </div></div></div></div>
+
+
+
+  <div class="modal fade" id="adjustModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center">
+
+    <div id="adj-img-container" class="mb-3"></div>
+
+    <h6 id="adj-title" class="fw-bold mb-1"></h6>
+
+    <p class="small text-muted">庫存量: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
+
+    
+
+    <div class="bg-light p-2 rounded-3 mb-3">
+
+        <label class="small text-muted d-block mb-1">存放位置備註</label>
+
+        <div class="input-group">
+
+            <input type="text" id="adj-note" class="form-control text-center" placeholder="輸入新的位置...">
+
+            <button class="btn btn-save-note" type="button" onclick="window.saveNoteOnly()">儲存備註</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="input-group mb-4 w-50 mx-auto">
+
+        <button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button>
+
+        <input type="number" id="adj-val" class="form-control text-center" value="1">
+
+        <button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button>
+
+    </div>
+
+    
+
+    <div class="row g-2">
+
+        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加庫存 (+)</button></div>
+
+        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回架上 (-)</button></div>
+
+        <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">⚠️ 徹底刪除紀錄</button></div>
+
+    </div>
+
+  </div></div></div>
+
+
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script src="https://unpkg.com/html5-qrcode"></script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+
   <script src="app.js"></script>
+
+  <script>function adjStep(n){ const i=document.getElementById('adj-val'); i.value=Math.max(1,parseInt(i.value)+n); }</script>
+
 </body>
+
 </html>
