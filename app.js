@@ -1,3 +1,4 @@
+
 const SB_URL = 'https://axbixhnhmimaxhpbhhvt.supabase.co';
 
 const SB_KEY = 'sb_publishable_yccbuWDlTisa2DvaRJEX9w_R1l8BBMB';
@@ -180,7 +181,7 @@ window.openAdjust = function(id, name, qty, imgUrl, note) {
 
     document.getElementById('adj-note').value = note;
 
-    document.getElementById('adj-img-container').innerHTML = imgUrl ? <img src="${imgUrl}" style="width:100px; height:100px; object-fit:cover; border-radius:10px;"> : '';
+    document.getElementById('adj-img-container').innerHTML = imgUrl ? `<img src="${imgUrl}" style="width:100px; height:100px; object-fit:cover; border-radius:10px;">` : '';
 
     const el = document.getElementById('adjustModal');
 
@@ -358,4 +359,52 @@ window.stopScan = function() { if(html5QrCode) { html5QrCode.stop().then(() => {
 
 window.submitInventory = async function() {
 
-    const d=document.getElementById('i-dept').value, b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').va
+    const d=document.getElementById('i-dept').value, b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').value, q=document.getElementById('i-qty').value, nt=document.getElementById('i-note').value, f=document.getElementById('i-photo').files[0], nWho=document.getElementById('i-notify-who').value;
+
+    if(!d||!b||!n||!q) return alert("必填未填"); setLoad(true);
+
+    try { let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.1}); const {data}=await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp); p=data.path; }
+
+    await _sb.from('inventory').insert([{dept:d, barcode:b, item_name:n, qty:parseInt(q), note:nt, photo_path:p, creator:currentUser.name}]);
+
+    if(nWho) await _sb.from('stock_items').insert([{sender_name:currentUser.name, owner_name:nWho, note:`入倉通知: ${n} (${q}件)`, photo_path:p, status:'待處理'}]);
+
+    invM.hide(); alert("入倉完成"); } catch(e){alert("失敗");} finally {setLoad(false);}
+
+};
+
+window.submitStock = async function() {
+
+    const o=document.getElementById('st-owner').value, n=document.getElementById('st-note').value, f=document.getElementById('st-photo').files[0];
+
+    if(!o||!n) return alert("必填項目未完成"); setLoad(true);
+
+    try { let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.15}); const {data}=await _sb.storage.from('photos').upload(`stock/${Date.now()}.jpg`, comp); p=data.path; }
+
+    await _sb.from('stock_items').insert([{sender_name:currentUser.name,owner_name:o,note:n,photo_path:p,status:'待處理'}]); stM.hide(); fetchStock(); alert("通知已送出"); } catch(e){alert("失敗");} finally {setLoad(false);}
+
+};
+
+function parseShift(c){ c=String(c||'').trim().toUpperCase(); if(!c||['休','OFF','例','年'].includes(c)) return {isW:false, disp:c}; const m={'O':'早班','X':'晚班','10':'10:00','O年':'早半','X年':'晚半'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
+
+function n2(n){ const s=String(n||""); return s.length>2?s.substring(s.length-2):s; }
+
+function setLoad(s){ document.getElementById('loading').style.display=s?'flex':'none'; }
+
+window.changeDate = function(n){ selectedDate.setDate(selectedDate.getDate()+n); fetchMainData(); };
+
+async function fetchStaffList(id) { const {data}=await _sb.from('staff').select('name').order('name'); document.getElementById(id).innerHTML='<option value="">--不通知--</option>'+data.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''); }
+
+async function fetchStock(){ const {data}=await _sb.from('stock_items').select('*').eq('status','待處理').order('created_at',{ascending:false}); const myPkgs=data?.filter(i=>i.owner_name===(currentUser?currentUser.name:'')); if(document.getElementById('notif-banner'))document.getElementById('notif-banner').style.display=myPkgs?.length>0?'block':'none'; document.getElementById('stk-list').innerHTML=data?.map(i=>{ const u=i.photo_path?_sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl:null; return `<div class="flat-card d-flex align-items-center gap-3">${u?`<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:10px" onclick="window.open('${u}')">`:'<div style="width:60px;height:60px;background:#eee;border-radius:10px"></div>'}<div class="flex-grow-1"><div class="fw-bold">${i.sender_name} → ${i.owner_name}</div><div class="small text-muted">備註: ${i.note}</div><button class="btn btn-sm btn-success w-100 mt-2 rounded-pill" onclick="window.handleDone('${i.id}','${i.photo_path}')">領取完成</button></div></div>`; }).join('')||'無通知'; }
+
+window.handleDone=async function(id,p){ if(!confirm("完成領取？"))return; setLoad(true); await _sb.from('stock_items').delete().eq('id',id); if(p&&p!=='null') await _sb.storage.from('photos').remove([p]); fetchStock(); setLoad(false); };
+
+window.uploadToDrive = async function() { const f = document.getElementById('up-drv-file').files[0]; if(!f) return; setLoad(true); const sn = encodeURIComponent(f.name).replace(/%/g, '__'); await _sb.storage.from('public_files').upload(`${Date.now()}_${sn}`, f); fetchDriveFiles(); setLoad(false); };
+
+window.deleteFile = async function(n) { if(!confirm("確定刪除？")) return; setLoad(true); await _sb.storage.from('public_files').remove([n]); fetchDriveFiles(); setLoad(false); };
+
+async function fetchDriveFiles() { const { data } = await _sb.storage.from('public_files').list('', {sortBy:{column:'created_at',order:'desc'}}); const l = document.getElementById('drv-list'); if(!l) return; l.innerHTML = data?.map(f => { let d = f.name; try { const r = f.name.split('_').slice(1).join('_'); d = decodeURIComponent(r.replace(/__/g, '%')); } catch(e){} const u = _sb.storage.from('public_files').getPublicUrl(f.name).data.publicUrl; const delBtn = (currentUser && currentUser.code === '555') ? `<button class="btn btn-sm text-danger" onclick="window.deleteFile('${f.name}')"><i class="fas fa-trash-alt"></i></button>` : ''; return `<div class="flat-card d-flex justify-content-between align-items-center mb-2"><span class="text-truncate small fw-bold" style="max-width:70%"><i class="far fa-file-pdf text-danger me-2"></i>${d}</span><div><a href="${u}" target="_blank" class="btn btn-sm btn-outline-primary me-2">看</a>${delBtn}</div></div>`; }).join('') || '無檔案'; }
+
+window.uploadExcel = async function() { const f = document.getElementById('xl-file').files[0]; if(!f) return; setLoad(true); const r = new FileReader(); r.readAsArrayBuffer(f); r.onload = async (e) => { try { const d = new Uint8Array(e.target.result), w = XLSX.read(d,{type:'array'}), s = w.Sheets[w.SheetNames[0]], j = XLSX.utils.sheet_to_json(s,{header:1}), ent = []; const dr = j[0]; [1,2,3].forEach(idx => { const row = j[idx], name = idx===1?"事項":idx===2?"早班值日":"晚班值日"; if(row)for(let c=1;c<row.length;c++)if(dr[c]&&row[c])ent.push({date:fmtD(dr[c]), staff_name:name, shift_code:String(row[c]).trim()}); }); for(let r=5;r<j.length;r++){ const row=j[r], name=row[0]; if(name&&!["行事曆","事項","早班值日","晚班值日"].includes(String(name).trim()))for(let c=1;c<row.length;c++)if(dr[c]&&row[c])ent.push({date:fmtD(dr[c]), staff_name:String(name).trim(), shift_code:String(row[c])}); } const map = new Map(); ent.forEach(i => map.set(`${i.date}_${i.staff_name}`, i)); await _sb.from('roster').upsert(Array.from(map.values()), { onConflict: 'date,staff_name' }); alert("同步成功"); fetchMainData(); } catch(e) { alert("失敗"); } finally { setLoad(false); } }; };
+
+function fmtD(v){ let d=(typeof v==='number')?new Date(Math.round((v-25569)*86400*1000)):new Date(v); return d.toISOString().split('T')[0]; }
