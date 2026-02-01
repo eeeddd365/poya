@@ -1,347 +1,218 @@
 <!DOCTYPE html>
-
 <html lang="zh-TW">
-
 <head>
-
   <meta charset="utf-8">
-
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-
-  <title>POYA 北屯東山二系統</title>
-
+  <title>POYA 倉庫管理系統</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
-
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
   <style>
-
     :root { --poya-pink: #ec008c; --poya-gradient: linear-gradient(135deg, #ec008c 0%, #ff66b2 100%); --poya-bg: #fdf2f8; }
-
-    body { background-color: var(--poya-bg); font-family: 'Noto Sans TC', sans-serif; color: #333; padding-bottom: 80px; overflow-x: hidden; }
-
+    body { background-color: var(--poya-bg); font-family: 'Noto Sans TC', sans-serif; color: #333; padding-bottom: 60px; overflow-x: hidden; }
     #loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; }
-
-    
-
-    /* 選單置中 */
-
-    .nav-tabs-poya { display: flex; justify-content: center; background: white; border-radius: 15px; padding: 5px; margin: 15px 0; overflow-x: auto; scrollbar-width: none; }
-
-    .nav-tabs-poya::-webkit-scrollbar { display: none; }
-
-    .nav-item-poya { flex: 0 0 auto; text-align: center; padding: 10px 15px; border-radius: 12px; color: #999; font-size: 0.85rem; cursor: pointer; }
-
-    .nav-item-poya.active { background: var(--poya-gradient); color: white; font-weight: bold; }
-
-
-
-    .s-O { background-color: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; } 
-
-    .s-X { background-color: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
-
     .flat-card { background: white; border-radius: 20px; margin-bottom: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-
-    .duty-box-day { background: linear-gradient(135deg, #f5222d 0%, #ff7875 100%); color: white; border-radius: 18px; padding: 12px; }
-
-    .duty-box-night { background: linear-gradient(135deg, #1890ff 0%, #69c0ff 100%); color: white; border-radius: 18px; padding: 12px; }
-
-    
-
-    .calendar-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #f0f0f0; padding: 3px; border-radius: 12px; margin-top: 10px; }
-
-    .cal-cell { background: white; border-radius: 6px; padding: 2px; text-align: center; min-height: 105px; display: flex; flex-direction: column; }
-
-    .cal-date { font-weight: 700; color: #bbb; font-size: 0.7rem; border-bottom: 1px solid #f9f9f9; }
-
-    .cal-is-today { border: 2.5px solid var(--poya-pink) !important; background: #fff0f6 !important; }
-
-    .staff-tag-group { display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; align-content: flex-start; flex-grow: 1; margin-top: 2px; }
-
-    .staff-tag-full { padding: 1px 2px; border-radius: 3px; font-weight: 700; font-size: 0.6rem !important; line-height: 1; white-space: nowrap; transform: scale(0.85); }
-
-
-
-    .inventory-img { width: 65px; height: 65px; object-fit: cover; border-radius: 12px; border: 1px solid #eee; }
-
-    .reader-box { width: 100%; border-radius: 15px; overflow: hidden; display: none; margin-bottom: 10px; border: 2px solid var(--poya-pink); }
-
-    .key { background: white; border-radius: 18px; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; }
-
-    #notif-banner { display: none; background: var(--poya-gradient); color: white; padding: 12px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; cursor: pointer; }
-
-    
-
-    /* 修正儲存按鈕樣式 */
-
-    .btn-save-note { background-color: #333; color: white; border: none; border-radius: 8px; padding: 0 15px; font-weight: bold; }
-
-    .btn-save-note:active { background-color: #000; }
-
+    .inventory-img { width: 70px; height: 70px; object-fit: cover; border-radius: 12px; border: 1px solid #eee; flex-shrink: 0; }
+    .reader-box { width: 100%; border-radius: 15px; overflow: hidden; display: none; margin-bottom: 15px; border: 3px solid var(--poya-pink); }
+    .key { background: white; border-radius: 18px; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 600; cursor: pointer; border: 1px solid #eee; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .btn-pink { background: var(--poya-gradient); color: white; border: none; border-radius: 50px; padding: 8px 20px; font-weight: 700; font-size: 0.9rem; }
+    .code-badge { font-size: 0.65rem; background: #f0f2f5; padding: 2px 6px; border-radius: 4px; color: #666; font-family: monospace; }
   </style>
-
 </head>
-
 <body>
-
   <div id="loading"><div class="spinner-border text-danger"></div></div>
 
-  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 有貨物入庫通知，請點此查看</div>
-
-
-
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-
-    <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
-
-    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700;">---</div>
-
+    <h2 style="color:var(--poya-pink); font-weight:900; margin-bottom:20px;">倉庫管理系統</h2>
+    <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700; letter-spacing: 5px;">---</div>
     <div class="keypad d-grid" style="grid-template-columns: repeat(3, 1fr); gap: 15px;">
-
       <div class="key" onclick="window.pressKey('1')">1</div><div class="key" onclick="window.pressKey('2')">2</div><div class="key" onclick="window.pressKey('3')">3</div>
-
       <div class="key" onclick="window.pressKey('4')">4</div><div class="key" onclick="window.pressKey('5')">5</div><div class="key" onclick="window.pressKey('6')">6</div>
-
       <div class="key" onclick="window.pressKey('7')">7</div><div class="key" onclick="window.pressKey('8')">8</div><div class="key" onclick="window.pressKey('9')">9</div>
-
       <div style="visibility:hidden"></div><div class="key" onclick="window.pressKey('0')">0</div><div class="key text-danger" onclick="window.pressKey('C')"><i class="fas fa-backspace"></i></div>
-
     </div>
-
   </div>
-
-
 
   <div id="view-main" style="display:none;" class="container py-3">
-
-    <div class="d-flex justify-content-between align-items-center mb-3 px-1">
-
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 id="u-name" class="fw-bold mb-0">夥伴</h4>
-
-        <div>
-
-            <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="window.openStockModal()">幫人入庫</button>
-
-            <button class="btn btn-pink btn-sm ms-1" onclick="window.openInvModal()">入倉</button>
-
+        <div class="d-flex gap-2 align-items-center">
+            <div id="admin-tools" style="display:none;">
+                <input type="file" id="excel-import" style="display:none" onchange="window.importInventoryExcel(this)">
+                <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="document.getElementById('excel-import').click()">匯入</button>
+            </div>
+            <button class="btn btn-danger btn-pink shadow-sm" onclick="window.openInvModal()"><i class="fas fa-plus me-1"></i> 商品入倉</button>
         </div>
-
     </div>
 
-
-
-    <div class="nav-tabs-poya shadow-sm mb-3">
-
-        <div id="t-ros" class="nav-item-poya active" onclick="window.switchTab('ros')">今日班表</div>
-
-        <div id="t-stk" class="nav-item-poya" onclick="window.switchTab('stk')">入庫管理</div>
-
-        <div id="t-inv" class="nav-item-poya" onclick="window.switchTab('inv')">倉庫查詢</div>
-
-        <div id="t-drv" class="nav-item-poya" onclick="window.switchTab('drv')">檔期檔案</div>
-
-        <div id="t-adm" class="nav-item-poya" style="display:none;" onclick="window.switchTab('adm')">管理員</div>
-
-    </div>
-
-
-
-    <div id="v-ros">
-
-        <div class="flat-card py-2 mb-2 text-center" style="background:#fffbe6;"><small id="v-note" class="fw-bold text-warning">今日無事項</small></div>
-
-        <div class="duty-card shadow-sm mb-3 rounded-4 bg-white p-3"><div class="row g-2">
-
-            <div class="col-6"><div class="duty-box-day text-center"><div class="small">早班值日</div><div id="v-dD" class="fw-bold fs-4">--</div></div></div>
-
-            <div class="col-6"><div class="duty-box-night text-center"><div class="small">晚班值日</div><div id="v-dN" class="fw-bold fs-4">--</div></div></div>
-
-        </div></div>
-
-        <div class="d-flex justify-content-between mb-2 px-1">
-
-            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(-1)">前一天</button>
-
-            <span id="h-date" class="fw-bold small pt-1"></span>
-
-            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(1)">後一天</button>
-
-        </div>
-
-        <div class="row g-2 mb-3">
-
-            <div class="col-6"><div class="flat-card h-100 p-2"><b>早班戰力</b><hr class="my-1"><div id="l-day"></div></div></div>
-
-            <div class="col-6"><div class="flat-card h-100 p-2"><b>晚班戰力</b><hr class="my-1"><div id="l-night"></div></div></div>
-
-        </div>
-
-        <div class="btn-group w-100 mb-2 p-1 bg-white rounded-pill shadow-sm">
-
-            <button id="btn-my-cal" class="btn btn-sm rounded-pill active" onclick="window.toggleCalMode('my')">個人班表</button>
-
-            <button id="btn-all-cal" class="btn btn-sm rounded-pill" onclick="window.toggleCalMode('all')">全店班表</button>
-
-        </div>
-
-        <div id="cal-grid" class="calendar-container"></div>
-
-    </div>
-
-
-
-    <div id="v-stk" style="display:none;"><div id="stk-list"></div></div>
-
-    
-
-    <div id="v-inv" style="display:none;">
-
+    <div id="v-inv">
         <div class="flat-card">
-
             <div id="q-reader" class="reader-box"></div>
-
-            <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill" onclick="window.startSearchScan()"><i class="fas fa-camera me-1"></i> 掃描條碼</button>
-
-            <select id="q-dept" class="form-select mb-2 rounded-pill" onchange="window.searchInventory()"><option value="">所有部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option></select>
-
-            <input type="text" id="q-barcode" class="form-control rounded-pill" placeholder="輸入條碼搜尋..." oninput="window.searchInventory()">
-
+            <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill py-2" onclick="window.startSearchScan()"><i class="fas fa-barcode"></i> 掃描搜尋</button>
+            <select id="q-dept" class="form-select mb-2 rounded-pill" onchange="window.searchInventory()">
+                <option value="">所有部門篩選</option>
+                <option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option>
+                <option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option>
+                <option>A16</option><option>A20</option>
+            </select>
+            <input type="text" id="q-barcode" class="form-control rounded-pill text-center" placeholder="輸入條碼、位置(8碼)或品名..." oninput="window.searchInventory()">
         </div>
-
         <div id="inv-results"></div>
-
     </div>
-
-
-
-    <div id="v-drv" style="display:none;">
-
-        <div id="drv-admin-area" style="display:none;" class="flat-card mb-3 text-center"><h6>上傳公務檔案</h6><input type="file" id="up-drv-file" class="form-control mb-2 rounded-pill"><button class="btn btn-pink w-100 btn-sm rounded-pill" onclick="window.uploadToDrive()">上傳</button></div>
-
-        <div id="drv-list"></div>
-
-    </div>
-
-    
-
-    <div id="v-adm" style="display:none;"><div class="flat-card"><h6>同步 Excel 班表</h6><input type="file" id="xl-file" class="form-control mb-2 rounded-pill"><button class="btn btn-pink w-100" onclick="window.uploadExcel()">開始同步</button></div></div>
-
   </div>
 
-
-
-  <div class="modal fade" id="stockModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
-
-    <h5 class="fw-bold mb-4 text-center">幫人入庫</h5>
-
-    <label class="small text-muted">負責夥伴</label><select id="st-owner" class="form-select mb-3"></select>
-
-    <label class="small text-muted">備註/位置</label><input type="text" id="st-note" class="form-control mb-3">
-
-    <input type="file" id="st-photo" class="form-control mb-4" accept="image/*">
-
-    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitStock()">送出通知</button>
-
-  </div></div></div></div>
-
-
-
-  <div class="modal fade" id="invModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
-
-    <h5 class="fw-bold mb-3 text-center">入倉作業</h5>
-
-    <div id="i-reader" class="reader-box"></div>
-
-    <button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill" onclick="window.startInvScan()"><i class="fas fa-barcode"></i> 啟動掃描器</button>
-
-    <select id="i-dept" class="form-select mb-2"><option value="">選擇部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option></select>
-
-    <input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼">
-
-    <input type="text" id="i-name" class="form-control mb-2" placeholder="品名">
-
+  <div class="modal fade" id="adjustModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center"><div id="adj-img-container" class="mb-2"></div><h6 id="adj-title" class="fw-bold"></h6><div class="bg-light p-2 rounded-3 mb-3 mt-2 text-start"><label class="small text-muted mb-1">編輯位置代碼</label><div class="input-group"><input type="text" id="adj-note" class="form-control text-center"><button class="btn btn-dark btn-sm" onclick="window.saveNoteOnly()">存</button></div></div><p class="small text-muted">目前庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p><div class="input-group mb-3 w-50 mx-auto"><button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button><input type="number" id="adj-val" class="form-control text-center" value="1"><button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button></div><div class="row g-2"><div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加</button></div><div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補貨</button></div><div class="col-12 mt-2"><button class="btn btn-outline-danger btn-sm border-0 py-2" onclick="window.deleteInventory()">⚠️ 徹底刪除</button></div></div></div></div></div></div>
+  
+  <div class="modal fade" id="invModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3 text-center">入倉作業</h5><div id="i-reader" class="reader-box"></div><button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill py-2" onclick="window.startInvScan()">啟動掃描器</button>
+    <label class="small text-muted">商品部門</label>
+    <select id="i-dept" class="form-select mb-2"><option value="A01">A01</option><option value="A02">A02</option><option value="A03">A03</option><option value="A04">A04</option><option value="A07">A07</option><option value="A08">A08</option><option value="A09">A09</option><option value="A10">A10</option><option value="A12">A12</option><option value="A15">A15</option><option value="A16">A16</option><option value="A20">A20</option></select>
+    <input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼" oninput="window.autoFillByBarcode(this.value)">
+    <input type="text" id="i-name" class="form-control mb-2 bg-light" placeholder="品名" readonly>
+    <div id="i-exist-img" class="text-center mb-3 p-2 bg-light rounded-3" style="display:none"><img src="" id="i-preview-src" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"></div>
     <input type="number" id="i-qty" class="form-control mb-2" placeholder="數量">
-
-    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置備註">
-
-    <input type="file" id="i-photo" class="form-control mb-2" accept="image/*">
-
-    <label class="small fw-bold text-primary mb-1">通知夥伴領取</label><select id="i-notify-who" class="form-select mb-3 border-primary"></select>
-
-    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitInventory()">確認入倉</button>
-
-  </div></div></div></div>
-
-
-
-  <div class="modal fade" id="adjustModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center">
-
-    <div id="adj-img-container" class="mb-3"></div>
-
-    <h6 id="adj-title" class="fw-bold mb-1"></h6>
-
-    <p class="small text-muted">庫存量: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
-
-    
-
-    <div class="bg-light p-2 rounded-3 mb-3">
-
-        <label class="small text-muted d-block mb-1">存放位置備註</label>
-
-        <div class="input-group">
-
-            <input type="text" id="adj-note" class="form-control text-center" placeholder="輸入新的位置...">
-
-            <button class="btn btn-save-note" type="button" onclick="window.saveNoteOnly()">儲存備註</button>
-
-        </div>
-
-    </div>
-
-
-
-    <div class="input-group mb-4 w-50 mx-auto">
-
-        <button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button>
-
-        <input type="number" id="adj-val" class="form-control text-center" value="1">
-
-        <button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button>
-
-    </div>
-
-    
-
-    <div class="row g-2">
-
-        <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加庫存 (+)</button></div>
-
-        <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回架上 (-)</button></div>
-
-        <div class="col-12 mt-2"><button class="btn btn-outline-danger w-100 py-2 border-0" onclick="window.deleteInventory()">⚠️ 徹底刪除紀錄</button></div>
-
-    </div>
-
-  </div></div></div>
-
-
+    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置碼 (8位)">
+    <input type="file" id="i-photo" class="form-control mb-3" accept="image/*">
+    <button class="btn btn-danger w-100 py-3 fw-bold btn-pink" onclick="window.submitInventory()">確認入倉</button></div></div></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <script src="https://unpkg.com/html5-qrcode"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+  <script>
+    const SB_URL = 'https://axbixhnhmimaxhpbhhvt.supabase.co';
+    const SB_KEY = 'sb_publishable_yccbuWDlTisa2DvaRJEX9w_R1l8BBMB';
+    const _sb = supabase.createClient(SB_URL, SB_KEY);
 
-  <script src="app.js"></script>
+    let currentUser = null, currentCode = "", html5QrCode = null, curAdjId = null, curAdjQty = 0, searchTimer = null, existPhotoPath = null;
 
-  <script>function adjStep(n){ const i=document.getElementById('adj-val'); i.value=Math.max(1,parseInt(i.value)+n); }</script>
+    // --- 登入 ---
+    window.pressKey = (v) => { if(v==='C') currentCode=""; else if(currentCode.length<3) currentCode+=v; document.getElementById('code-val').innerText=currentCode||"---"; if(currentCode.length===3) checkLogin(); };
+    async function checkLogin() {
+        setLoad(true);
+        const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
+        if (data) {
+            currentUser = data;
+            document.getElementById('view-login').style.display = 'none';
+            document.getElementById('view-main').style.display = 'block';
+            document.getElementById('u-name').innerText = "夥伴: " + data.name;
+            if(currentUser.code === '555') document.getElementById('admin-tools').style.display = 'block';
+        } else { alert("代碼錯誤"); currentCode=""; }
+        setLoad(false);
+    }
 
+    // --- Excel 匯入 ---
+    window.importInventoryExcel = (input) => {
+        const file = input.files[0]; if(!file) return;
+        setLoad(true);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+                const { data: dbData } = await _sb.from('inventory').select('id, barcode');
+                const dbMap = new Map(); dbData.forEach(item => dbMap.set(String(item.barcode), item.id));
+                const upserts = [];
+                for(let r of rows.slice(1)) {
+                    if(!r[0]) continue;
+                    const storeCode = String(r[0]).trim();
+                    const intlCode = r[1] ? String(r[1]).trim() : null;
+                    const name = r[2] ? String(r[2]).trim() : "未命名";
+                    if(intlCode && dbMap.has(intlCode) && !intlCode.startsWith('21000')) {
+                        await _sb.from('inventory').update({ barcode: storeCode, international_code: intlCode, item_name: name }).eq('id', dbMap.get(intlCode));
+                    } else {
+                        upserts.push({ barcode: storeCode, international_code: intlCode, item_name: name, dept: storeCode.substring(0,2), qty: 0 });
+                    }
+                }
+                if(upserts.length > 0) await _sb.from('inventory').upsert(upserts, { onConflict: 'barcode' });
+                alert(`匯入成功！`);
+            } catch(e){ alert("失敗: " + e.message); }
+            setLoad(false); input.value = "";
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    // --- 自動帶出品名照片 ---
+    window.autoFillByBarcode = async (val) => {
+        if(val.length < 5) return;
+        const { data } = await _sb.from('inventory').select('*').or(`barcode.eq.${val},international_code.eq.${val}`).limit(1);
+        const nameInput = document.getElementById('i-name');
+        if(data && data.length > 0) {
+            const i = data[0];
+            nameInput.value = i.item_name; nameInput.readOnly = true;
+            document.getElementById('i-note').value = i.note || "";
+            document.getElementById('i-dept').value = i.dept || "A01";
+            if(i.photo_path) {
+                existPhotoPath = i.photo_path;
+                document.getElementById('i-preview-src').src = _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl;
+                document.getElementById('i-exist-img').style.display = 'block';
+            } else { existPhotoPath = null; document.getElementById('i-exist-img').style.display = 'none'; }
+        } else { nameInput.value = ""; nameInput.readOnly = false; document.getElementById('i-exist-img').style.display = 'none'; }
+    };
+
+    // --- 倉庫查詢 ---
+    window.searchInventory = () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            const d = document.getElementById('q-dept').value, b = document.getElementById('q-barcode').value;
+            if(!d && !b) { document.getElementById('inv-results').innerHTML = ""; return; }
+            setLoad(true);
+            let qry = _sb.from('inventory').select('*').gt('qty', 0);
+            if(d) qry = qry.eq('dept', d);
+            if(b) qry = qry.or(`barcode.ilike.%${b}%,international_code.ilike.%${b}%,item_name.ilike.%${b}%,note.ilike.%${b}%`);
+            const { data } = await qry.order('created_at', {ascending: false}).limit(30);
+            document.getElementById('inv-results').innerHTML = data?.map(i => {
+                const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : 'https://via.placeholder.com/70';
+                return `<div class="flat-card d-flex align-items-center gap-3" onclick="window.openAdjust('${i.id}','${i.item_name}',${i.qty},'${i.photo_path}','${i.note}')">
+                    <img src="${u}" class="inventory-img">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <div class="fw-bold text-truncate">${i.item_name}</div>
+                        <div class="mt-1 d-flex gap-1"><span class="code-badge">店:${i.barcode}</span></div>
+                        <div class="small text-muted mt-1">位置: <b class="text-primary">${i.note||'無'}</b> | 庫存: <b class="text-danger">${i.qty}</b></div>
+                    </div><i class="fas fa-edit text-muted"></i></div>`;
+            }).join('') || '<div class="text-center p-4">查無商品</div>';
+            setLoad(false);
+        }, 350);
+    };
+
+    // --- 業務邏輯與彈窗 ---
+    window.openInvModal = () => { new bootstrap.Modal(document.getElementById('invModal')).show(); };
+    window.openAdjust = (id, n, q, p, nt) => {
+        curAdjId = id; curAdjQty = q;
+        document.getElementById('adj-title').innerText = n;
+        document.getElementById('adj-current-qty').innerText = q;
+        document.getElementById('adj-note').value = nt || "";
+        const u = p ? _sb.storage.from('photos').getPublicUrl(p).data.publicUrl : '';
+        document.getElementById('adj-img-container').innerHTML = u ? `<img src="${u}" class="inventory-img mb-2" style="width:100px;height:100px">` : '';
+        new bootstrap.Modal(document.getElementById('adjustModal')).show();
+    };
+
+    window.saveNoteOnly = async () => { setLoad(true); await _sb.from('inventory').update({ note: document.getElementById('adj-note').value }).eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
+    window.adjustInventory = async (type) => {
+        const v = parseInt(document.getElementById('adj-val').value)||1;
+        const newQ = type==='add' ? curAdjQty+v : curAdjQty-v;
+        setLoad(true); await _sb.from('inventory').update({ qty: newQ, note: document.getElementById('adj-note').value }).eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false);
+    };
+    window.deleteInventory = async () => { if(!confirm("確定刪除？")) return; setLoad(true); await _sb.from('inventory').delete().eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
+
+    window.submitInventory = async function() {
+        const b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').value, q=document.getElementById('i-qty').value, nt=document.getElementById('i-note').value, f=document.getElementById('i-photo').files[0], d=document.getElementById('i-dept').value;
+        if(!b||!q) return alert("必填未填"); setLoad(true);
+        try {
+            let p = existPhotoPath; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.1}); const {data}=await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp); p=data.path; }
+            const { data: exist } = await _sb.from('inventory').select('id, qty').or(`barcode.eq.${b},international_code.eq.${b}`).limit(1);
+            if(exist && exist.length > 0) await _sb.from('inventory').update({ item_name: n, qty: exist[0].qty + parseInt(q), note: nt, photo_path: p, dept: d }).eq('id', exist[0].id);
+            else await _sb.from('inventory').insert([{ dept: d, barcode: b, item_name: n||'新商品', qty: parseInt(q), note: nt, photo_path: p, creator: currentUser.name }]);
+            bootstrap.Modal.getInstance(document.getElementById('invModal')).hide(); alert("作業成功");
+        } catch(e){ alert("失敗"); } finally { setLoad(false); }
+    };
+
+    window.startScanner = (divId, inputId, callback) => { document.getElementById(divId).style.display = 'block'; html5QrCode = new Html5Qrcode(divId); html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => { document.getElementById(inputId).value = text; window.stopScan(); if(callback) callback(text); }).catch(() => alert("相機失敗")); };
+    window.stopScan = () => { if(html5QrCode) { html5QrCode.stop().then(() => { document.querySelectorAll('.reader-box').forEach(el=>el.style.display='none'); html5QrCode = null; }); } };
+    window.startSearchScan = () => window.startScanner("q-reader", "q-barcode", window.searchInventory);
+    window.startInvScan = () => window.startScanner("i-reader", "i-barcode", window.autoFillByBarcode);
+    function setLoad(s){ document.getElementById('loading').style.display=s?'flex':'none'; }
+    function adjStep(n){ const i=document.getElementById('adj-val'); i.value=Math.max(1,parseInt(i.value)+n); }
+  </script>
 </body>
-
 </html>
