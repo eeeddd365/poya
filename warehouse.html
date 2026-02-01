@@ -21,13 +21,14 @@
     .reader-box { width: 100%; border-radius: 15px; overflow: hidden; display: none; margin-bottom: 15px; border: 3px solid var(--poya-pink); }
     .key { background: white; border-radius: 18px; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 600; cursor: pointer; border: 1px solid #eee; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
     .fixed-bottom { z-index: 1050; background: white; border-top: 1px solid #eee; }
+    .btn-pink { background: var(--poya-gradient); color: white; border: none; border-radius: 50px; padding: 12px 20px; font-weight: 700; width: 100%; }
   </style>
 </head>
 <body>
   <div id="loading"><div class="spinner-border text-danger"></div></div>
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-    <h2 style="color:var(--poya-pink); font-weight:900; margin-bottom:20px;">倉庫管理系統</h2>
+    <h2 style="color:var(--poya-pink); font-weight:900; margin-bottom:20px;">倉庫管理登入</h2>
     <div id="code-val" style="font-size:3.5rem; margin-bottom:30px; font-weight: 700; letter-spacing: 5px;">---</div>
     <div class="keypad d-grid" style="grid-template-columns: repeat(3, 1fr); gap: 15px;">
       <div class="key" onclick="window.pressKey('1')">1</div><div class="key" onclick="window.pressKey('2')">2</div><div class="key" onclick="window.pressKey('3')">3</div>
@@ -42,7 +43,7 @@
         <h4 id="u-name" class="fw-bold mb-0">夥伴</h4>
         <div id="admin-tools" style="display:none;">
             <input type="file" id="excel-import" style="display:none" onchange="window.importInventoryExcel(this)">
-            <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="document.getElementById('excel-import').click()">匯入條碼資料</button>
+            <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="document.getElementById('excel-import').click()">匯入條碼品名</button>
         </div>
     </div>
 
@@ -51,9 +52,9 @@
         <div id="t-inv" class="nav-item-warehouse" onclick="window.switchTab('inv')">庫存搜尋</div>
     </div>
 
-    <div id="v-loc"><div class="flat-card text-center"><div id="loc-reader" class="reader-box"></div><button class="btn btn-outline-secondary w-100 mb-3 rounded-pill py-2" onclick="window.startLocScan()"><i class="fas fa-camera me-2"></i> 掃描條碼</button><input type="text" id="loc-search-barcode" class="form-control rounded-pill text-center" placeholder="或手動輸入條碼" oninput="window.searchLocation()"></div><div id="loc-result-area"></div></div>
+    <div id="v-loc"><div class="flat-card text-center"><div id="loc-reader" class="reader-box"></div><button class="btn btn-outline-secondary w-100 mb-3 rounded-pill py-2" onclick="window.startLocScan()"><i class="fas fa-camera me-2"></i> 掃描條碼查位置</button><input type="text" id="loc-search-barcode" class="form-control rounded-pill text-center" placeholder="輸入條碼" oninput="window.searchLocation()"></div><div id="loc-result-area"></div></div>
 
-    <div id="v-inv" style="display:none;"><div class="flat-card"><div id="q-reader" class="reader-box"></div><button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill py-2" onclick="window.startSearchScan()"><i class="fas fa-barcode"></i> 掃描條碼搜尋</button><input type="text" id="q-barcode" class="form-control rounded-pill text-center" placeholder="搜尋條碼或品名..." oninput="window.searchInventory()"></div><div id="inv-results"></div></div>
+    <div id="v-inv" style="display:none;"><div class="flat-card"><div id="q-reader" class="reader-box"></div><button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill py-2" onclick="window.startSearchScan()"><i class="fas fa-barcode"></i> 掃描搜尋</button><input type="text" id="q-barcode" class="form-control rounded-pill text-center" placeholder="搜尋條碼或品名..." oninput="window.searchInventory()"></div><div id="inv-results"></div></div>
 
     <div class="fixed-bottom p-3 d-flex gap-2">
         <button class="btn btn-outline-danger rounded-pill fw-bold py-2 flex-grow-1" onclick="window.openStockModal()">幫人入庫</button>
@@ -63,8 +64,8 @@
 
   <div class="modal fade" id="locModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center"><h5 class="fw-bold mb-3">設定位置碼</h5><p class="small text-muted" id="edit-loc-barcode"></p><input type="number" id="loc-code-input" class="form-control form-control-lg text-center mb-2" placeholder="8位數字"><div id="loc-preview" class="small text-primary fw-bold"></div><button class="btn btn-danger w-100 py-3 fw-bold mt-3" style="background:#ec008c; border:none;" onclick="window.saveLocation()">儲存</button></div></div></div></div>
   <div class="modal fade" id="adjustModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center"><div id="adj-img-container" class="mb-2"></div><h6 id="adj-title" class="fw-bold"></h6><div class="bg-light p-2 rounded-3 mb-3 mt-2 text-start"><label class="small text-muted mb-1">編輯位置代碼</label><div class="input-group"><input type="text" id="adj-note" class="form-control text-center"><button class="btn btn-dark btn-sm" onclick="window.saveNoteOnly()">存</button></div></div><p class="small text-muted">目前庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p><div class="input-group mb-3 w-50 mx-auto"><button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button><input type="number" id="adj-val" class="form-control text-center" value="1"><button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button></div><div class="row g-2"><div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加</button></div><div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補貨</button></div><div class="col-12 mt-2"><button class="btn btn-outline-danger btn-sm border-0 py-2" onclick="window.deleteInventory()">⚠️ 徹底刪除</button></div></div></div></div></div></div>
-  <div class="modal fade" id="invModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3 text-center">入倉作業</h5><div id="i-reader" class="reader-box"></div><button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill py-2" onclick="window.startInvScan()">啟動掃描器</button><input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼" oninput="window.autoFillByBarcode(this.value)"><input type="text" id="i-name" class="form-control mb-2 bg-light" placeholder="品名 (若無可手動編輯)" readonly><div id="i-exist-img" class="text-center mb-3 p-2 bg-light rounded-3" style="display:none"><small class="text-success fw-bold">已存有商品照片</small><br><img src="" id="i-preview-src" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"></div><input type="number" id="i-qty" class="form-control mb-2" placeholder="入庫數量"><input type="text" id="i-note" class="form-control mb-2" placeholder="位置碼 (8位)"><input type="file" id="i-photo" class="form-control mb-3" accept="image/*"><select id="i-notify-who" class="form-select mb-3 border-primary"></select><button class="btn btn-danger w-100 py-3 fw-bold" style="background:#ec008c; border:none;" onclick="window.submitInventory()">確認入倉</button></div></div></div></div>
-  <div class="modal fade" id="stockModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-4 text-center">幫人入庫</h5><label class="small text-muted">負責夥伴</label><select id="st-owner" class="form-select mb-3"></select><input type="text" id="st-note" class="form-control mb-3" placeholder="位置/備註"><input type="file" id="st-photo" class="form-control mb-4" accept="image/*"><button class="btn btn-danger w-100 py-3 fw-bold" style="background:#ec008c; border:none;" onclick="window.submitStock()">送出通知</button></div></div></div></div>
+  <div class="modal fade" id="invModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3 text-center">入倉作業</h5><div id="i-reader" class="reader-box"></div><button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill py-2" onclick="window.startInvScan()">啟動掃描器</button><input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼" oninput="window.autoFillByBarcode(this.value)"><input type="text" id="i-name" class="form-control mb-2 bg-light" placeholder="品名 (查無可手動輸入)" readonly><div id="i-exist-img" class="text-center mb-3 p-2 bg-light rounded-3" style="display:none"><small class="text-success fw-bold">已有照片</small><br><img src="" id="i-preview-src" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"></div><input type="number" id="i-qty" class="form-control mb-2" placeholder="數量"><input type="text" id="i-note" class="form-control mb-2" placeholder="位置碼"><input type="file" id="i-photo" class="form-control mb-3" accept="image/*"><select id="i-notify-who" class="form-select mb-3 border-primary"></select><button class="btn btn-danger w-100 py-3 fw-bold" style="background:#ec008c; border:none;" onclick="window.submitInventory()">確認入倉</button></div></div></div></div>
+  <div class="modal fade" id="stockModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-4 text-center">幫人入庫</h5><label class="small text-muted">負責夥伴</label><select id="st-owner" class="form-select mb-3"></select><input type="text" id="st-note" class="form-control mb-3" placeholder="位置"><input type="file" id="st-photo" class="form-control mb-4" accept="image/*"><button class="btn btn-danger w-100 py-3 fw-bold" style="background:#ec008c; border:none;" onclick="window.submitStock()">送出通知</button></div></div></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -78,9 +79,7 @@
 
     let currentUser = null, currentCode = "", html5QrCode = null, curAdjId = null, curAdjQty = 0, curLocBarcode = "", searchTimer = null, existPhotoPath = null;
 
-    // --- 初始化 ---
-    window.openInvModal = () => { document.getElementById('i-name').value=""; document.getElementById('i-name').readOnly=true; document.getElementById('i-exist-img').style.display='none'; new bootstrap.Modal(document.getElementById('invModal')).show(); };
-    window.openStockModal = () => { new bootstrap.Modal(document.getElementById('stockModal')).show(); };
+    // --- 登入 ---
     window.pressKey = (v) => { if(v==='C') currentCode=""; else if(currentCode.length<3) currentCode+=v; document.getElementById('code-val').innerText=currentCode||"---"; if(currentCode.length===3) checkLogin(); };
     async function checkLogin() {
         setLoad(true);
@@ -96,7 +95,7 @@
         setLoad(false);
     }
 
-    // --- Excel 匯入 (智慧比對 21000 開頭規則) ---
+    // --- Excel 匯入 (智慧比對 21000 開頭與舊資料轉移) ---
     window.importInventoryExcel = (input) => {
         const file = input.files[0]; if(!file) return;
         setLoad(true);
@@ -109,42 +108,51 @@
                 
                 const { data: dbData } = await _sb.from('inventory').select('id, barcode');
                 const dbBarcodeMap = new Map();
-                dbData.forEach(item => dbBarcodeMap.set(item.barcode, item.id));
+                dbData.forEach(item => dbBarcodeMap.set(String(item.barcode), item.id));
 
                 let added = 0, migrated = 0;
                 const rowsToUpsert = [];
 
                 for(let r of rows.slice(1)) {
                     if(!r[0]) continue;
-                    const storeCode = String(r[0]).trim(); // A:店內
-                    const intlCode = r[1] ? String(r[1]).trim() : null; // B:國際
+                    const storeCode = String(r[0]).trim(); // A:店內碼
+                    const intlCode = r[1] ? String(r[1]).trim() : null; // B:國際碼
                     const name = r[2] ? String(r[2]).trim() : "未命名";
 
-                    // 關鍵邏輯：如果資料庫裡目前存的是「國際碼」(不以21000開頭)，且它匹配這筆的國際碼
+                    // 檢查資料庫目前的 barcode 欄位是否存的是「國際碼」(不以21000開頭)
                     if(intlCode && dbBarcodeMap.has(intlCode) && !intlCode.startsWith('21000')) {
-                        await _sb.from('inventory').update({ barcode: storeCode, international_code: intlCode, item_name: name }).eq('id', dbBarcodeMap.get(intlCode));
+                        await _sb.from('inventory').update({ 
+                            barcode: storeCode, 
+                            international_code: intlCode, 
+                            item_name: name 
+                        }).eq('id', dbBarcodeMap.get(intlCode));
                         migrated++;
                     } else {
-                        rowsToUpsert.push({ barcode: storeCode, international_code: intlCode, item_name: name, dept: storeCode.substring(0,2), qty: 0 });
+                        rowsToUpsert.push({ 
+                            barcode: storeCode, 
+                            international_code: intlCode, 
+                            item_name: name, 
+                            dept: storeCode.substring(0,2), 
+                            qty: 0 
+                        });
                         added++;
                     }
                 }
 
                 if(rowsToUpsert.length > 0) {
-                    const chunkSize = 100;
+                    const chunkSize = 50;
                     for (let i = 0; i < rowsToUpsert.length; i += chunkSize) {
-                        const { error } = await _sb.from('inventory').upsert(rowsToUpsert.slice(i, i + chunkSize), { onConflict: 'barcode' });
-                        if(error) throw error;
+                        await _sb.from('inventory').upsert(rowsToUpsert.slice(i, i + chunkSize), { onConflict: 'barcode' });
                     }
                 }
-                alert(`匯入完成！新建立: ${added} 筆, 自動遷移舊資料: ${migrated} 筆`);
+                alert(`匯入完成！新建立: ${added} 筆, 自動更新舊紀錄: ${migrated} 筆`);
             } catch(e){ alert("失敗: " + e.message); }
             setLoad(false); input.value = "";
         };
         reader.readAsArrayBuffer(file);
     };
 
-    // --- 自動帶出邏輯 (查無則開啟編輯) ---
+    // --- 自動補完 ---
     window.autoFillByBarcode = async (val) => {
         if(val.length < 5) return;
         const { data } = await _sb.from('inventory').select('*').or(`barcode.eq.${val},international_code.eq.${val}`).limit(1);
@@ -159,12 +167,12 @@
                 document.getElementById('i-exist-img').style.display = 'block';
             } else { existPhotoPath = null; document.getElementById('i-exist-img').style.display = 'none'; }
         } else {
-            nameInput.value = ""; nameInput.readOnly = false; // 查無資料，解鎖手動編輯
+            nameInput.value = ""; nameInput.readOnly = false; // 開放手動輸入
             document.getElementById('i-exist-img').style.display = 'none';
         }
     };
 
-    // --- 搜尋與位置 ---
+    // --- 業務邏輯 ---
     window.parseLocCode = (c) => { const s = String(c||""); if(s.length!==8 || isNaN(s)) return s || "未設定"; return `${s.substring(0,2)}部/${parseInt(s.substring(2,4))}排/${s.substring(4,6)==="01"?"陽":"陰"}/${parseInt(s.substring(6,8))}座`; };
     window.searchLocation = async () => {
         const b = document.getElementById('loc-search-barcode').value; if(!b) return;
@@ -172,8 +180,8 @@
         const area = document.getElementById('loc-result-area');
         if(data && data.length > 0) {
             const i = data[0];
-            area.innerHTML = `<div class="flat-card text-center"><div class="fw-bold fs-5">${i.item_name}</div><div class="loc-tag mt-2">貨架位置</div><div class="mt-2 loc-display">${window.parseLocCode(i.note)}</div><button class="btn btn-sm btn-outline-primary mt-3 px-4 rounded-pill" onclick="window.openLocEdit('${i.barcode}')">修改位置</button></div>`;
-        } else { area.innerHTML = `<div class="flat-card text-center p-4"><p class="text-muted">查無此條碼</p><button class="btn btn-danger rounded-pill px-4" style="background:#ec008c; border:none;" onclick="window.openLocEdit('${b}')">建立位置</button></div>`; }
+            area.innerHTML = `<div class="flat-card text-center"><div class="fw-bold fs-5">${i.item_name}</div><div class="loc-tag mt-2">位置</div><div class="mt-2 loc-display">${window.parseLocCode(i.note)}</div><button class="btn btn-sm btn-outline-primary mt-3 px-4 rounded-pill" onclick="window.openLocEdit('${i.barcode}')">修改位置</button></div>`;
+        } else { area.innerHTML = `<div class="flat-card text-center p-4"><p class="text-muted">查無此條碼</p><button class="btn btn-danger rounded-pill px-4" style="background:#ec008c; border:none;" onclick="window.openLocEdit('${b}')">立即建立</button></div>`; }
     };
     window.searchInventory = () => {
         clearTimeout(searchTimer);
@@ -184,7 +192,9 @@
         }, 300);
     };
 
-    // --- 工具 ---
+    // --- 通用與彈窗 ---
+    window.openInvModal = () => { new bootstrap.Modal(document.getElementById('invModal')).show(); };
+    window.openStockModal = () => { new bootstrap.Modal(document.getElementById('stockModal')).show(); };
     window.startScanner = (divId, inputId, callback) => {
         document.getElementById(divId).style.display = 'block';
         html5QrCode = new Html5Qrcode(divId);
@@ -198,7 +208,6 @@
     window.startLocScan = () => window.startScanner("loc-reader", "loc-search-barcode", window.searchLocation);
     window.startSearchScan = () => window.startScanner("q-reader", "q-barcode", window.searchInventory);
     window.startInvScan = () => window.startScanner("i-reader", "i-barcode", window.autoFillByBarcode);
-
     window.saveLocation = async () => {
         const c = document.getElementById('loc-code-input').value; if(c.length!==8) return alert("須8位數");
         setLoad(true);
@@ -207,7 +216,7 @@
         else await _sb.from('inventory').insert([{ barcode: curLocBarcode, item_name: prompt("品名:")||"新商品", note: c, dept: String(curLocBarcode).substring(0,2), qty: 0 }]);
         bootstrap.Modal.getInstance(document.getElementById('locModal')).hide(); window.searchLocation(); setLoad(false);
     };
-
+    window.openLocEdit = (b) => { curLocBarcode = b; document.getElementById('edit-loc-barcode').innerText=b; new bootstrap.Modal(document.getElementById('locModal')).show(); };
     window.openAdjust = (id, name, qty, path, note) => {
         curAdjId = id; curAdjQty = qty;
         document.getElementById('adj-title').innerText = name;
@@ -217,7 +226,6 @@
         document.getElementById('adj-img-container').innerHTML = u ? `<img src="${u}" class="inventory-img mb-2">` : '';
         new bootstrap.Modal(document.getElementById('adjustModal')).show();
     };
-
     window.saveNoteOnly = async () => { setLoad(true); await _sb.from('inventory').update({ note: document.getElementById('adj-note').value }).eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
     window.adjustInventory = async (type) => {
         const v = parseInt(document.getElementById('adj-val').value)||1;
@@ -225,7 +233,6 @@
         setLoad(true); await _sb.from('inventory').update({ qty: newQ, note: document.getElementById('adj-note').value }).eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false);
     };
     window.deleteInventory = async () => { if(!confirm("確定刪除？")) return; setLoad(true); await _sb.from('inventory').delete().eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
-
     window.submitInventory = async function() {
         const b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').value, q=document.getElementById('i-qty').value, nt=document.getElementById('i-note').value, f=document.getElementById('i-photo').files[0], nWho=document.getElementById('i-notify-who').value;
         if(!b||!q) return alert("必填未填"); setLoad(true);
@@ -235,18 +242,16 @@
             if(exist && exist.length > 0) await _sb.from('inventory').update({ item_name: n, qty: exist[0].qty + parseInt(q), note: nt, photo_path: p }).eq('id', exist[0].id);
             else await _sb.from('inventory').insert([{ dept: b.substring(0,2), barcode: b, item_name: n||'新商品', qty: parseInt(q), note: nt, photo_path: p, creator: currentUser.name }]);
             if(nWho) await _sb.from('stock_items').insert([{ sender_name: currentUser.name, owner_name: nWho, note: `入倉: ${n||b}`, photo_path: p, status: '待處理' }]);
-            bootstrap.Modal.getInstance(document.getElementById('invModal')).hide(); alert("入倉成功");
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('invModal')).hide(); alert("作業成功");
         } catch(e){ alert("失敗"); } finally { setLoad(false); }
     };
-
     window.submitStock = async function() {
         const o=document.getElementById('st-owner').value, n=document.getElementById('st-note').value, f=document.getElementById('st-photo').files[0];
-        if(!o||!n) return alert("必填項目未完成"); setLoad(true);
+        if(!o||!n) return alert("必填未填"); setLoad(true);
         try { let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.15}); const {data}=await _sb.storage.from('photos').upload(`stock/${Date.now()}.jpg`, comp); p=data.path; }
-        await _sb.from('stock_items').insert([{sender_name:currentUser.name,owner_name:o,note:n,photo_path:p,status:'待處理'}]); bootstrap.Modal.getInstance(document.getElementById('stockModal')).hide(); alert("通知成功"); } catch(e){alert("失敗");} finally {setLoad(false);}
+        await _sb.from('stock_items').insert([{sender_name:currentUser.name,owner_name:o,note:n,photo_path:p,status:'待處理'}]); bootstrap.Modal.getOrCreateInstance(document.getElementById('stockModal')).hide(); alert("通知成功"); } catch(e){alert("失敗");} finally {setLoad(false);}
     };
-
-    async function fetchStaffList(id) { const {data}=await _sb.from('staff').select('name').order('name'); document.getElementById(id).innerHTML='<option value="">--不通知--</option>'+data.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''); }
+    async function fetchStaffList(id) { const {data}=await _sb.from('staff').select('name').order('name'); document.getElementById(id).innerHTML='<option value="">不通知</option>'+data.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''); }
     function setLoad(s){ document.getElementById('loading').style.display=s?'flex':'none'; }
     function adjStep(n){ const i=document.getElementById('adj-val'); i.value=Math.max(1,parseInt(i.value)+n); }
   </script>
