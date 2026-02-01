@@ -55,7 +55,7 @@
                 <option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option>
                 <option>A16</option><option>A20</option>
             </select>
-            <input type="text" id="q-barcode" class="form-control rounded-pill text-center" placeholder="輸入條碼、位置(8碼)或品名..." oninput="window.searchInventory()">
+            <input type="text" id="q-barcode" class="form-control rounded-pill text-center" placeholder="輸入條碼、位置或品名..." oninput="window.searchInventory()">
         </div>
         <div id="inv-results"></div>
     </div>
@@ -70,7 +70,7 @@
     <input type="text" id="i-name" class="form-control mb-2 bg-light" placeholder="品名" readonly>
     <div id="i-exist-img" class="text-center mb-3 p-2 bg-light rounded-3" style="display:none"><img src="" id="i-preview-src" style="width:80px;height:80px;object-fit:cover;border-radius:8px;"></div>
     <input type="number" id="i-qty" class="form-control mb-2" placeholder="數量">
-    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置碼 (8位)">
+    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置碼">
     <input type="file" id="i-photo" class="form-control mb-3" accept="image/*">
     <button class="btn btn-danger w-100 py-3 fw-bold btn-pink" onclick="window.submitInventory()">確認入倉</button></div></div></div></div>
 
@@ -216,3 +216,4 @@
   </script>
 </body>
 </html>
+
