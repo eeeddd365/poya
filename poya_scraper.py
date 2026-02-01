@@ -1,5 +1,4 @@
 import os
-import json
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
@@ -8,75 +7,75 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 分類對應名稱
-CATEGORIES = {
-    "260": "紙棉用品",
-    "261": "居家清潔",
-    "262": "生活雜貨",
-    "263": "生活用品"
-}
+# 測試特定網址
+TARGET_URL = "https://www.poyabuy.com.tw/v2/official/SalePageCategory/374016?sortMode=Sales"
 
-def scrape_poya():
+def scrape():
     with sync_playwright() as p:
+        # 啟動瀏覽器
         browser = p.chromium.launch(headless=True)
-        # 模擬完全真實的手機瀏覽器
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            viewport={'width': 1280, 'height': 800}
         )
         page = context.new_page()
 
-        all_products = []
+        print(f"🚀 正在存取網址: {TARGET_URL}")
+        
+        try:
+            # 進入頁面並等待
+            page.goto(TARGET_URL, wait_until="networkidle", timeout=60000)
+            page.wait_for_timeout(7000) # 多等 7 秒確保渲染完成
 
-        # 監聽後端 API 響應
-        def handle_response(response):
-            # 尋找包含商品清單的 API 網址 (91APP 常用關鍵字: SearchList)
-            if "SearchList" in response.url and response.status == 200:
+            # 模擬捲動觸發 Lazy Load
+            page.mouse.wheel(0, 2000)
+            page.wait_for_timeout(3000)
+
+            # 偵錯：截圖留存（如果失敗可以在 GitHub Actions 看到頁面長怎樣）
+            page.screenshot(path="debug_screen.png")
+            print("📸 已截圖存檔為 debug_screen.png")
+
+            # 抓取邏輯：針對 91APP 體系的商品卡片結構
+            # 1. 先抓所有商品 A 標籤
+            product_nodes = page.locator("a[href*='SalePage']").all()
+            print(f"🔍 找到潛在商品節點數: {len(product_nodes)}")
+
+            data_list = []
+            for node in product_nodes:
                 try:
-                    data = response.json()
-                    # 91APP 的 JSON 結構通常在 Data.Entries 裡
-                    items = data.get("Data", {}).get("Entries", [])
-                    print(f"📡 攔截到 API 數據，取得 {len(items)} 個品項")
+                    # 抓取圖片：尋找 A 標籤內的 img
+                    img_el = node.locator("img").first
+                    img_url = img_el.get_attribute("src") or img_el.get_attribute("data-src")
                     
-                    for item in items:
-                        title = item.get("Title")
-                        # 取得高清原圖
-                        img = item.get("CoverImageUrl")
-                        if title and img:
-                            all_products.append({
-                                "title": title,
-                                "image_url": "https:" + img if img.startswith("//") else img,
-                                # 根據 URL 判斷分類，這裡稍後處理
-                                "category": "未分類" 
-                            })
-                except Exception as e:
-                    print(f"解析 API 錯誤: {e}")
+                    # 抓取標題：尋找包含標題文字的 div 或 p
+                    title = node.inner_text().split('\n')[0].strip()
 
-        page.on("response", handle_response)
+                    if title and img_url and len(title) > 5:
+                        if img_url.startswith("//"):
+                            img_url = "https:" + img_url
+                        
+                        data_list.append({
+                            "title": title,
+                            "image_url": img_url,
+                            "category": "紙棉用品"
+                        })
+                except:
+                    continue
 
-        for cat_id, cat_name in CATEGORIES.items():
-            target_url = f"https://www.poyabuy.com.tw/v2/official/SalePageCategory/{cat_id}"
-            print(f"🚀 正在開啟分類網址: {cat_name}...")
-            
-            # 訪問網址會觸發背景 API 調用
-            page.goto(target_url, wait_until="networkidle", timeout=60000)
-            page.wait_for_timeout(5000) # 多等一下讓 API 跑完
-            
-            # 標註分類
-            for p_item in all_products:
-                if p_item["category"] == "未分類":
-                    p_item["category"] = cat_name
+            # 寫入資料庫
+            if data_list:
+                # 簡單去重
+                unique_data = {v['title']: v for v in data_list}.values()
+                print(f"💾 準備寫入 {len(unique_data)} 筆商品到 Supabase...")
+                supabase.table("poya_items").upsert(list(unique_data), on_conflict="title").execute()
+                print("✅ 寫入成功！")
+            else:
+                print("❌ 依然沒抓到商品。請確認 Table 'poya_items' 的 title 欄位是否設為 Primary Key。")
 
-        # 寫入 Supabase
-        if all_products:
-            print(f"💾 總共取得 {len(all_products)} 筆資料，準備存入 Supabase...")
-            # 去重
-            unique_data = {v['title']: v for v in all_products}.values()
-            supabase.table("poya_items").upsert(list(unique_data), on_conflict="title").execute()
-            print("✅ 任務完成！")
-        else:
-            print("❌ 依然攔截不到數據。這代表寶雅封鎖了 GitHub 的連線。")
-
+        except Exception as e:
+            print(f"❌ 執行出錯: {e}")
+        
         browser.close()
 
 if __name__ == "__main__":
-    scrape_poya()
+    scrape()
