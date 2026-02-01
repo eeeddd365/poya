@@ -12,21 +12,20 @@
     body { background-color: var(--poya-bg); font-family: 'Noto Sans TC', sans-serif; color: #333; padding-bottom: 80px; overflow-x: hidden; }
     #loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; }
     .nav-tabs-poya { display: flex; justify-content: center; background: white; border-radius: 15px; padding: 5px; margin: 15px 0; overflow-x: auto; scrollbar-width: none; }
-    .nav-tabs-poya::-webkit-scrollbar { display: none; }
     .nav-item-poya { flex: 0 0 auto; text-align: center; padding: 10px 15px; border-radius: 12px; color: #999; font-size: 0.85rem; cursor: pointer; }
     .nav-item-poya.active { background: var(--poya-gradient); color: white; font-weight: bold; }
     .flat-card { background: white; border-radius: 20px; margin-bottom: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
     .inventory-img { width: 75px; height: 75px; object-fit: cover; border-radius: 12px; border: 1px solid #eee; flex-shrink: 0; }
     .reader-box { width: 100%; border-radius: 15px; overflow: hidden; display: none; margin-bottom: 10px; border: 2px solid var(--poya-pink); }
     .key { background: white; border-radius: 18px; width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee; }
-    #notif-banner { display: none; background: var(--poya-gradient); color: white; padding: 12px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; cursor: pointer; }
-    .btn-save-note { background-color: #333; color: white; border: none; border-radius: 8px; padding: 0 15px; font-weight: bold; }
-    .code-badge { font-size: 0.65rem; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; color: #666; font-family: monospace; }
+    .code-badge { font-size: 0.65rem; background: #f0f2f5; padding: 2px 6px; border-radius: 4px; color: #666; font-family: monospace; }
+    .s-O { background-color: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; } 
+    .s-X { background-color: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
   </style>
 </head>
 <body>
   <div id="loading"><div class="spinner-border text-danger"></div></div>
-  <div id="notif-banner" onclick="window.switchTab('stk')"><i class="fas fa-bell me-2"></i> 有貨物入庫通知，請點此查看</div>
+  <div id="notif-banner" style="display:none; background:var(--poya-gradient); color:white; padding:12px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000;" onclick="window.switchTab('stk')">有貨物通知，請查看</div>
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
     <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
@@ -56,7 +55,7 @@
     </div>
 
     <div id="v-ros">
-        <div id="cal-grid" class="calendar-container"></div>
+        <div id="cal-grid" class="calendar-container" style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px;"></div>
     </div>
 
     <div id="v-stk" style="display:none;"><div id="stk-list"></div></div>
@@ -64,40 +63,50 @@
     <div id="v-inv" style="display:none;">
         <div class="flat-card">
             <div id="q-reader" class="reader-box"></div>
-            <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill" onclick="window.startSearchScan()"><i class="fas fa-camera me-1"></i> 掃描條碼</button>
+            <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill" onclick="window.startSearchScan()"><i class="fas fa-camera"></i> 掃描搜尋</button>
             <select id="q-dept" class="form-select mb-2 rounded-pill" onchange="window.searchInventory()">
-                <option value="">所有部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option>
+                <option value="">所有部門</option>
+                <option value="A01">A01</option><option value="A02">A02</option><option value="A03">A03</option><option value="A04">A04</option><option value="A07">A07</option><option value="A08">A08</option><option value="A09">A09</option><option value="A10">A10</option><option value="A12">A12</option><option value="A15">A15</option><option value="A16">A16</option><option value="A20">A20</option>
             </select>
-            <input type="text" id="q-barcode" class="form-control rounded-pill" placeholder="輸入條碼、位置(8碼)或品名..." oninput="window.searchInventory()">
+            <input type="text" id="q-barcode" class="form-control rounded-pill" placeholder="輸入條碼、品名或位置搜尋..." oninput="window.searchInventory()">
         </div>
         <div id="inv-results"></div>
     </div>
 
     <div id="v-adm" style="display:none;">
-        <div class="flat-card mb-3"><h6>品名資料匯入</h6><input type="file" id="inv-xl-file" class="form-control mb-2 rounded-pill" onchange="window.importInventoryExcel(this)"></div>
+        <div class="flat-card mb-3"><h6>智慧匯入品名檔 (Excel)</h6><input type="file" class="form-control rounded-pill" onchange="window.importInventoryExcel(this)"></div>
     </div>
   </div>
 
   <div class="modal fade" id="invModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
-    <h5 class="fw-bold mb-3 text-center">入倉作業</h5>
+    <h5 class="fw-bold mb-3 text-center">商品入倉</h5>
     <div id="i-reader" class="reader-box"></div>
     <button class="btn btn-sm btn-outline-secondary w-100 mb-3 rounded-pill" onclick="window.startInvScan()">啟動掃描器</button>
-    <label class="small text-muted">部門</label>
+    <label class="small text-muted">選擇部門</label>
     <select id="i-dept" class="form-select mb-2"><option value="A01">A01</option><option value="A02">A02</option><option value="A03">A03</option><option value="A04">A04</option><option value="A07">A07</option><option value="A08">A08</option><option value="A09">A09</option><option value="A10">A10</option><option value="A12">A12</option><option value="A15">A15</option><option value="A16">A16</option><option value="A20">A20</option></select>
-    <input type="text" id="i-barcode" class="form-control mb-2" placeholder="條碼" oninput="window.autoFillByBarcode(this.value)">
-    <input type="text" id="i-name" class="form-control mb-2 bg-light" placeholder="品名" readonly>
+    <input type="text" id="i-barcode" class="form-control mb-2" placeholder="掃描或輸入條碼" oninput="window.autoFillByBarcode(this.value)">
+    <input type="text" id="i-name" class="form-control mb-2 bg-light" placeholder="品名 (查無可手動輸入)" readonly>
     <div id="i-exist-img" class="text-center mb-2" style="display:none"><img src="" id="i-preview-src" style="width:60px;height:60px;object-fit:cover;border-radius:8px;"></div>
     <input type="number" id="i-qty" class="form-control mb-2" placeholder="數量">
-    <input type="text" id="i-note" class="form-control mb-2" placeholder="位置碼 (8位)">
-    <input type="file" id="i-photo" class="form-control mb-2" accept="image/*">
+    <input type="text" id="i-note" class="form-control mb-2" placeholder="存放位置 (8碼)">
+    <input type="file" id="i-photo" class="form-control mb-3" accept="image/*">
+    <label class="small fw-bold text-primary mb-1">通知夥伴領取</label><select id="i-notify-who" class="form-select mb-3 border-primary"></select>
     <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitInventory()">確認入倉</button>
   </div></div></div></div>
 
   <div class="modal fade" id="adjustModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center">
     <div id="adj-img-container" class="mb-3"></div><h6 id="adj-title" class="fw-bold"></h6><p class="small text-muted">目前庫存: <span id="adj-current-qty" class="text-danger fw-bold"></span></p>
-    <div class="bg-light p-2 rounded-3 mb-3"><div class="input-group"><input type="text" id="adj-note" class="form-control text-center" placeholder="位置碼"><button class="btn btn-dark btn-sm" onclick="window.saveNoteOnly()">儲存</button></div></div>
+    <div class="bg-light p-2 rounded-3 mb-3"><div class="input-group"><input type="text" id="adj-note" class="form-control text-center" placeholder="位置碼"><button class="btn btn-dark btn-sm" onclick="window.saveNoteOnly()">存</button></div></div>
     <div class="input-group mb-4 w-50 mx-auto"><button class="btn btn-outline-secondary" onclick="adjStep(-1)">-</button><input type="number" id="adj-val" class="form-control text-center" value="1"><button class="btn btn-outline-secondary" onclick="adjStep(1)">+</button></div>
-    <div class="row g-2"><div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加</button></div><div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回</button></div></div>
+    <div class="row g-2"><div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="window.adjustInventory('add')">增加</button></div><div class="col-6"><button class="btn btn-success w-100 py-3" onclick="window.adjustInventory('sub')">補回</button></div><div class="col-12 mt-2"><button class="btn btn-outline-danger btn-sm border-0 py-2" onclick="window.deleteInventory()">⚠️ 徹底刪除紀錄</button></div></div>
+  </div></div></div></div>
+
+  <div class="modal fade" id="stockModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4">
+    <h5 class="fw-bold mb-4 text-center">幫人入庫</h5>
+    <label class="small text-muted">負責夥伴</label><select id="st-owner" class="form-select mb-3"></select>
+    <input type="text" id="st-note" class="form-control mb-3" placeholder="備註/位置">
+    <input type="file" id="st-photo" class="form-control mb-4" accept="image/*">
+    <button class="btn btn-pink w-100 py-3 fw-bold" onclick="window.submitStock()">送出通知</button>
   </div></div></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -106,5 +115,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
   <script src="app.js"></script>
+  <script>function adjStep(n){ const i=document.getElementById('adj-val'); i.value=Math.max(1,parseInt(i.value)+n); }</script>
 </body>
 </html>
