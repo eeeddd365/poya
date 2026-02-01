@@ -7,7 +7,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 分類 ID
+# 寶雅正確的分類 ID
 CATEGORIES = {
     "紙棉用品": "374016",
     "居家清潔": "374018",
@@ -16,21 +16,22 @@ CATEGORIES = {
 }
 
 def get_poya_data():
-    # 這是 91APP 的官方搜尋與分類 API 介面
-    api_url = "https://m-api.poyabuy.com.tw/v2/Search/SearchList"
+    # 這是 91APP 最核心的 API 進入點，必須包含 ShopId
+    api_url = "https://api.poyabuy.com.tw/MobileApi/v1/SalePage/SearchList"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
         "Content-Type": "application/json",
-        "Referer": "https://www.poyabuy.com.tw/",
-        "Origin": "https://www.poyabuy.com.tw"
+        "Accept": "application/json",
+        "Referer": "https://www.poyabuy.com.tw/"
     }
 
     for cat_name, cat_id in CATEGORIES.items():
         print(f"--- 📡 正在請求 API: {cat_name} ---")
         
-        # 針對 91APP v2 API 的格式
+        # 必須包含 ShopId (1104 是寶雅的代碼)
         payload = {
+            "ShopId": 1104,
             "SalePageCategoryId": int(cat_id),
             "SortMode": "Sales",
             "PageIndex": 0,
@@ -38,39 +39,35 @@ def get_poya_data():
         }
 
         try:
-            # 嘗試使用 m-api 這個子網域，它是專門跑數據的
+            # 寶雅的 API 需要用 POST
             response = requests.post(api_url, json=payload, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
-                # 91APP 的數據通常在 Data 裡面的 Entries 或各個列表
+                # 數據結構在 Data.Entries
                 items = data.get("Data", {}).get("Entries", [])
                 
-                if not items:
-                    print(f"⚠️ API 成功但沒有數據，可能格式不對。")
-                    continue
-
-                print(f"✅ {cat_name} 取得 {len(items)} 筆商品")
-                
-                data_list = []
-                for item in items:
-                    title = item.get("Title")
-                    img = item.get("CoverImageUrl")
-                    if title and img:
-                        clean_img = "https:" + img if img.startswith("//") else img
-                        data_list.append({
-                            "title": title.strip(),
-                            "image_url": clean_img,
-                            "category": cat_name
-                        })
-
-                if data_list:
+                if items:
+                    print(f"✅ {cat_name} 成功取得 {len(items)} 筆商品")
+                    data_list = []
+                    for item in items:
+                        title = item.get("Title")
+                        img = item.get("CoverImageUrl")
+                        if title and img:
+                            clean_img = "https:" + img if img.startswith("//") else img
+                            data_list.append({
+                                "title": title.strip(),
+                                "image_url": clean_img,
+                                "category": cat_name
+                            })
+                    
+                    # 存入 Supabase
                     supabase.table("poya_items").upsert(data_list, on_conflict="title").execute()
-                    print(f"💾 {cat_name} 資料已同步至 Supabase")
+                    print(f"💾 {cat_name} 已同步。")
+                else:
+                    print(f"⚠️ 請求成功但沒資料，API 結構可能有變。")
             else:
-                print(f"❌ API 請求失敗，狀態碼: {response.status_code}")
-                # 嘗試改用最簡單的官網 API 網址備案
-                print("💡 嘗試切換備用網址方案...")
+                print(f"❌ API 失敗，狀態碼: {response.status_code}")
                 
         except Exception as e:
             print(f"❌ 發生異常: {e}")
