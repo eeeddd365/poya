@@ -21,15 +21,11 @@
     .code-badge { font-size: 0.65rem; background: #f0f2f5; padding: 2px 6px; border-radius: 4px; color: #666; font-family: monospace; }
     .s-O { background-color: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; } 
     .s-X { background-color: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
-    .calendar-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #f0f0f0; padding: 3px; border-radius: 12px; }
-    .cal-cell { background: white; border-radius: 6px; padding: 2px; text-align: center; min-height: 100px; display: flex; flex-direction: column; }
-    .cal-date { font-weight: 700; color: #bbb; font-size: 0.7rem; margin-bottom: 2px; }
-    .cal-is-today { border: 2px solid var(--poya-pink) !important; background: #fff0f6 !important; }
-    .staff-tag-group { display: flex; flex-wrap: wrap; gap: 1px; justify-content: center; font-size: 0.5rem; }
   </style>
 </head>
 <body>
   <div id="loading"><div class="spinner-border text-danger"></div></div>
+  <div id="notif-banner" style="display:none; background:var(--poya-gradient); color:white; padding:12px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000;" onclick="window.switchTab('stk')">有貨物通知，請查看</div>
 
   <div id="view-login" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
     <h1 style="color:var(--poya-pink); font-weight:900; letter-spacing: 12px;">POYA</h1>
@@ -59,12 +55,7 @@
     </div>
 
     <div id="v-ros">
-        <div class="d-flex justify-content-between mb-2">
-            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(-1)">前一天</button>
-            <span id="h-date" class="fw-bold small pt-1"></span>
-            <button class="btn btn-sm btn-light rounded-pill px-3" onclick="window.changeDate(1)">後一天</button>
-        </div>
-        <div id="cal-grid" class="calendar-container"></div>
+        <div id="cal-grid" class="calendar-container" style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px;"></div>
     </div>
 
     <div id="v-stk" style="display:none;"><div id="stk-list"></div></div>
@@ -84,7 +75,6 @@
 
     <div id="v-adm" style="display:none;">
         <div class="flat-card mb-3"><h6>智慧匯入品名檔 (Excel)</h6><input type="file" class="form-control rounded-pill" onchange="window.importInventoryExcel(this)"></div>
-        <div class="flat-card"><h6>班表同步</h6><input type="file" id="xl-file" class="form-control mb-2 rounded-pill"><button class="btn btn-pink w-100" onclick="window.uploadExcel()">開始同步</button></div>
     </div>
   </div>
 
