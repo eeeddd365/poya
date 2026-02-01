@@ -93,6 +93,11 @@
         <div class="flat-card">
             <div id="q-reader" class="reader-box"></div>
             <button class="btn btn-sm btn-outline-secondary w-100 mb-2 rounded-pill" onclick="window.startSearchScan()"><i class="fas fa-camera me-1"></i> 掃描條碼</button>
+            
+            <select id="q-dept" class="form-select mb-2 rounded-pill" onchange="window.searchInventory()">
+                <option value="">所有部門</option><option>A01</option><option>A02</option><option>A03</option><option>A04</option><option>A07</option><option>A08</option><option>A09</option><option>A10</option><option>A12</option><option>A15</option><option>A16</option><option>A20</option>
+            </select>
+            
             <input type="text" id="q-barcode" class="form-control rounded-pill" placeholder="搜尋條碼或品名..." oninput="window.searchInventory()">
         </div>
         <div id="inv-results"></div>
@@ -138,7 +143,7 @@
     <div class="bg-light p-2 rounded-3 mb-3">
         <label class="small text-muted d-block mb-1">存放位置碼</label>
         <div class="input-group">
-            <input type="text" id="adj-note" class="form-control text-center" placeholder="8位數字...">
+            <input type="text" id="adj-note" class="form-control text-center" placeholder="輸入紙箱編號...">
             <button class="btn btn-save-note" type="button" onclick="window.saveNoteOnly()">儲存</button>
         </div>
     </div>
