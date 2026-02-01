@@ -1,0 +1,28 @@
+name: Poya Data Sync
+
+on:
+  schedule:
+    - cron: '0 20 * * *' # 每天台灣時間凌晨 4 點自動更新
+  workflow_dispatch:      # 讓你可以手動按按鈕執行
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright supabase
+          playwright install chromium
+
+      - name: Run Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python poya_scraper.py
