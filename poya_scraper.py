@@ -1,13 +1,16 @@
 import os
 import requests
 from supabase import create_client
+import urllib3
+
+# 關閉不安全連線的警告（因為我們用 IP 訪問會導致憑證不符，但這不影響抓資料）
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 初始化 Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 寶雅正確的分類 ID
 CATEGORIES = {
     "紙棉用品": "374016",
     "居家清潔": "374018",
@@ -16,20 +19,21 @@ CATEGORIES = {
 }
 
 def get_poya_data():
-    # 這是 91APP 最核心的 API 進入點，必須包含 ShopId
-    api_url = "https://api.poyabuy.com.tw/MobileApi/v1/SalePage/SearchList"
+    # 強制使用 IP 位址訪問，跳過 DNS 階段
+    # 如果 104.18.27.165 不行，可以換 104.18.26.165
+    target_ip = "104.18.27.165" 
+    api_url = f"https://{target_ip}/MobileApi/v1/SalePage/SearchList"
     
     headers = {
+        "Host": "api.poyabuy.com.tw", # 關鍵：告訴伺服器你其實是要找寶雅
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "Referer": "https://www.poyabuy.com.tw/"
     }
 
     for cat_name, cat_id in CATEGORIES.items():
-        print(f"--- 📡 正在請求 API: {cat_name} ---")
+        print(f"--- 📡 正在強行請求: {cat_name} (透過 IP: {target_ip}) ---")
         
-        # 必須包含 ShopId (1104 是寶雅的代碼)
         payload = {
             "ShopId": 1104,
             "SalePageCategoryId": int(cat_id),
@@ -39,12 +43,11 @@ def get_poya_data():
         }
 
         try:
-            # 寶雅的 API 需要用 POST
-            response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            # verify=False 是為了繞過 IP 訪問時的 SSL 憑證檢查
+            response = requests.post(api_url, json=payload, headers=headers, timeout=30, verify=False)
             
             if response.status_code == 200:
                 data = response.json()
-                # 數據結構在 Data.Entries
                 items = data.get("Data", {}).get("Entries", [])
                 
                 if items:
@@ -61,11 +64,10 @@ def get_poya_data():
                                 "category": cat_name
                             })
                     
-                    # 存入 Supabase
                     supabase.table("poya_items").upsert(data_list, on_conflict="title").execute()
-                    print(f"💾 {cat_name} 已同步。")
+                    print(f"💾 {cat_name} 資料已存入 Supabase")
                 else:
-                    print(f"⚠️ 請求成功但沒資料，API 結構可能有變。")
+                    print(f"⚠️ API 請求成功但沒資料，可能 Payload 需要調整。")
             else:
                 print(f"❌ API 失敗，狀態碼: {response.status_code}")
                 
