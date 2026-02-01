@@ -6,12 +6,12 @@ const staffMap = { 'A':'張敏鴻','J':'張舜斌','Y':'廖婕茹','C':'許志�
 let currentUser = null, currentCode = "", selectedDate = new Date(), calMode = 'my', allMonthData = [];
 let stM = null, invM = null, adjM = null, html5QrCode = null, curAdjId = null, curAdjQty = 0, searchTimer = null, existPhotoPath = null;
 
-// --- 登入控制 ---
-window.pressKey = (v) => { if(v==='C') currentCode=""; else if(currentCode.length<3) currentCode+=v; document.getElementById('code-val').innerText=currentCode||"---"; if(currentCode.length===3) checkLogin(); };
+// --- 登入邏輯 ---
+window.pressKey = (v) => { if(v==='C')currentCode=""; else if(currentCode.length<3)currentCode+=v; document.getElementById('code-val').innerText=currentCode||"---"; if(currentCode.length===3)checkLogin(); };
 async function checkLogin() {
     setLoad(true);
     try {
-        const { data, error } = await _sb.from('staff').select('*').eq('code', currentCode).single();
+        const { data } = await _sb.from('staff').select('*').eq('code', currentCode).single();
         if (data) {
             currentUser = data;
             document.getElementById('u-name').innerText = "夥伴, " + data.name;
@@ -27,8 +27,8 @@ async function initApp() {
     await Promise.all([fetchMainData(), fetchStock(), fetchStaffList('i-notify-who'), fetchStaffList('st-owner')]); 
 }
 
-// --- 分頁與條碼聯動 ---
-window.switchTab = (t) => { window.stopScan?.(); ['v-ros','v-stk','v-inv','v-drv','v-adm'].forEach(v => { const el = document.getElementById(v); if(el) el.style.display = 'none'; }); ['t-ros','t-stk','t-inv','t-drv','t-adm'].forEach(tab => { const el = document.getElementById(tab); if(el) el.classList.remove('active'); }); document.getElementById('v-'+t).style.display = 'block'; document.getElementById('t-'+t).classList.add('active'); if(t === 'drv') fetchDriveFiles(); };
+// --- 分頁與條碼比對 ---
+window.switchTab = (t) => { window.stopScan?.(); ['v-ros','v-stk','v-inv','v-adm'].forEach(v => { const el = document.getElementById(v); if(el) el.style.display = 'none'; }); ['t-ros','t-stk','t-inv','t-adm'].forEach(tab => { const el = document.getElementById(tab); if(el) el.classList.remove('active'); }); document.getElementById('v-'+t).style.display = 'block'; document.getElementById('t-'+t).classList.add('active'); };
 
 window.autoFillByBarcode = async (val) => {
     if(val.length < 5) return;
@@ -46,7 +46,7 @@ window.autoFillByBarcode = async (val) => {
     } else { nameInput.value = ""; nameInput.readOnly = false; document.getElementById('i-exist-img').style.display = 'none'; }
 };
 
-// --- 倉庫查詢 (帶縮圖與部門) ---
+// --- 倉庫查詢 (核心：位置搜尋、左側縮圖、雙碼顯示) ---
 window.searchInventory = function() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async () => {
@@ -55,12 +55,21 @@ window.searchInventory = function() {
         setLoad(true);
         let qry = _sb.from('inventory').select('*');
         if(d) qry = qry.eq('dept', d);
-        if(b) qry = qry.or(`barcode.ilike.%${b}%,international_code.ilike.%${b}%,item_name.ilike.%${b}%`);
+        if(b) qry = qry.or(`barcode.ilike.%${b}%,international_code.ilike.%${b}%,item_name.ilike.%${b}%,note.ilike.%${b}%`);
         const { data } = await qry.order('created_at', {ascending: false});
         document.getElementById('inv-results').innerHTML = data?.map(i => {
-            const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : 'https://via.placeholder.com/65';
-            return `<div class="flat-card d-flex align-items-center gap-3" onclick="window.openAdjust('${i.id}','${i.item_name}',${i.qty},'${u}','${i.note || ''}')"><img src="${u}" class="inventory-img"><div class="flex-grow-1"><div class="fw-bold">${i.item_name}</div><div class="small text-muted">庫存: <b class="text-danger">${i.qty}</b> | 位置:${i.note||'無'}</div></div><i class="fas fa-edit text-muted"></i></div>`;
-        }).join('') || '<div class="text-center p-4">無資料</div>';
+            const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : 'https://via.placeholder.com/75';
+            return `<div class="flat-card d-flex align-items-center gap-3" onclick="window.openAdjust('${i.id}','${i.item_name}',${i.qty},'${u}','${i.note || ''}')">
+                <img src="${u}" class="inventory-img">
+                <div class="flex-grow-1 overflow-hidden">
+                    <div class="fw-bold text-truncate">${i.item_name}</div>
+                    <div class="mt-1 d-flex gap-1">
+                        <span class="code-badge">店:${i.barcode}</span>
+                        <span class="code-badge">國:${i.international_code || '無'}</span>
+                    </div>
+                    <div class="small text-muted mt-1">位置: <b class="text-primary">${i.note || '未定'}</b> | 庫存: <b class="text-danger">${i.qty}</b></div>
+                </div><i class="fas fa-edit text-muted"></i></div>`;
+        }).join('') || '<div class="text-center p-4">查無資料</div>';
         setLoad(false);
     }, 300);
 };
@@ -86,34 +95,35 @@ window.importInventoryExcel = (input) => {
                 } else { upserts.push({ barcode: storeCode, international_code: intlCode, item_name: name, dept: storeCode.substring(0,2), qty: 0 }); aCount++; }
             }
             if(upserts.length>0) await _sb.from('inventory').upsert(upserts, { onConflict: 'barcode' });
-            alert(`匯入完成！新增:${aCount}, 遷移:${mCount}`);
+            alert(`匯入完成！新增:${aCount}, 遷移舊資料:${mCount}`);
         } catch(e){ alert("失敗: " + e.message); }
         setLoad(false); input.value = "";
     };
     reader.readAsArrayBuffer(file);
 };
 
-// --- 彈窗處理 ---
+// --- 通用功能 (掃描、彈窗、儲存) ---
 window.openInvModal = () => { new bootstrap.Modal(document.getElementById('invModal')).show(); };
 window.openStockModal = () => { new bootstrap.Modal(document.getElementById('stockModal')).show(); };
 window.openAdjust = (id, name, qty, u, note) => { curAdjId = id; curAdjQty = qty; document.getElementById('adj-title').innerText = name; document.getElementById('adj-current-qty').innerText = qty; document.getElementById('adj-note').value = note; document.getElementById('adj-img-container').innerHTML = `<img src="${u}" style="width:100px; height:100px; object-fit:cover; border-radius:10px;">`; new bootstrap.Modal(document.getElementById('adjustModal')).show(); };
 
-// --- 基礎業務邏輯 ---
 window.submitInventory = async function() {
-    const b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').value, q=document.getElementById('i-qty').value, nt=document.getElementById('i-note').value, f=document.getElementById('i-photo').files[0], d=document.getElementById('i-dept').value;
+    const b=document.getElementById('i-barcode').value, n=document.getElementById('i-name').value, q=document.getElementById('i-qty').value, nt=document.getElementById('i-note').value, f=document.getElementById('i-photo').files[0], d=document.getElementById('i-dept').value, nWho=document.getElementById('i-notify-who').value;
     if(!b||!q) return alert("必填未填"); setLoad(true);
     try {
         let p = existPhotoPath; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.1}); const {data}=await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp); p=data.path; }
         const { data: exist } = await _sb.from('inventory').select('id, qty').or(`barcode.eq.${b},international_code.eq.${b}`).limit(1);
         if(exist && exist.length > 0) await _sb.from('inventory').update({ item_name: n, qty: exist[0].qty + parseInt(q), note: nt, photo_path: p, dept: d }).eq('id', exist[0].id);
         else await _sb.from('inventory').insert([{ dept: d, barcode: b, item_name: n||'新商品', qty: parseInt(q), note: nt, photo_path: p, creator: currentUser.name }]);
+        if(nWho) await _sb.from('stock_items').insert([{ sender_name: currentUser.name, owner_name: nWho, note: `入倉: ${n||b}`, photo_path: p, status: '待處理' }]);
         bootstrap.Modal.getInstance(document.getElementById('invModal')).hide(); alert("入倉成功");
     } catch(e){ alert("失敗"); } finally { setLoad(false); }
 };
 
 window.saveNoteOnly = async () => { setLoad(true); await _sb.from('inventory').update({ note: document.getElementById('adj-note').value }).eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
 window.adjustInventory = async (type) => { const v = parseInt(document.getElementById('adj-val').value)||1; const nQ = type==='add'?curAdjQty+v:curAdjQty-v; setLoad(true); await _sb.from('inventory').update({ qty: nQ, note: document.getElementById('adj-note').value }).eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
-window.deleteInventory = async () => { if(!confirm("刪除？")) return; setLoad(true); await _sb.from('inventory').delete().eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
+window.deleteInventory = async () => { if(!confirm("徹底刪除？")) return; setLoad(true); await _sb.from('inventory').delete().eq('id', curAdjId); bootstrap.Modal.getInstance(document.getElementById('adjustModal')).hide(); window.searchInventory(); setLoad(false); };
+
 window.submitStock = async function() { const o=document.getElementById('st-owner').value, n=document.getElementById('st-note').value, f=document.getElementById('st-photo').files[0]; setLoad(true); try { let p=null; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.15}); const {data}=await _sb.storage.from('photos').upload(`stock/${Date.now()}.jpg`, comp); p=data.path; } await _sb.from('stock_items').insert([{sender_name:currentUser.name,owner_name:o,note:n,photo_path:p,status:'待處理'}]); bootstrap.Modal.getInstance(document.getElementById('stockModal')).hide(); fetchStock(); alert("通知成功"); } catch(e){alert("失敗");} finally {setLoad(false);} };
 async function fetchStaffList(id) { const {data}=await _sb.from('staff').select('name').order('name'); const el=document.getElementById(id); if(el) el.innerHTML='<option value="">--不通知--</option>'+data.map(s=>`<option value="${s.name}">${s.name}</option>`).join(''); }
 async function fetchStock(){ const {data}=await _sb.from('stock_items').select('*').eq('status','待處理'); if(data?.some(i=>i.owner_name===currentUser?.name)) document.getElementById('notif-banner').style.display='block'; }
@@ -122,15 +132,12 @@ window.stopScan = () => { if(html5QrCode) { html5QrCode.stop().then(() => { docu
 window.startInvScan = () => window.startScanner("i-reader", "i-barcode", window.autoFillByBarcode);
 window.startSearchScan = () => window.startScanner("q-reader", "q-barcode");
 function setLoad(s){ document.getElementById('loading').style.display=s?'flex':'none'; }
-window.changeDate = (n) => { selectedDate.setDate(selectedDate.getDate()+n); fetchMainData(); };
+
+// --- 原有班表功能 (略) ---
 async function fetchMainData() {
     const ds = selectedDate.toISOString().split('T')[0]; document.getElementById('h-date').innerText = ds;
     const { data } = await _sb.from('roster').select('*').gte('date', ds.substring(0,8)+'01').lte('date', ds.substring(0,8)+'31'); allMonthData = data || [];
-    const ld=document.getElementById('l-day'), ln=document.getElementById('l-night'), nt=document.getElementById('v-note'), dD=document.getElementById('v-dD'), dN=document.getElementById('v-dN');
-    ld.innerHTML=''; ln.innerHTML=''; nt.innerText="今日無事項"; dD.innerText="--"; dN.innerText="--";
-    allMonthData.filter(x=>x.date===ds).forEach(r=>{ const n=String(r.staff_name).trim(), c=r.shift_code?String(r.shift_code).trim():""; if(n==="事項") nt.innerText=c; else if(n==="早班值日") dD.innerText=staffMap[c]||c; else if(n==="晚班值日") dN.innerText=staffMap[c]||c; else { const s=parseShift(c); if(s.isW){ const h=`<div class="d-flex justify-content-between py-1"><span>${n}</span><b>${s.disp}</b></div>`; if(s.type==='day') ld.innerHTML+=h; else ln.innerHTML+=h; } } });
     renderCalendar();
 }
-function renderCalendar() { const grid = document.getElementById('cal-grid'); if(!grid) return; grid.innerHTML = ''; const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), days = new Date(y, m+1, 0).getDate(), dsT = new Date().toISOString().split('T')[0]; for(let d=1; d<=days; d++) { const dS = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const dayData = allMonthData.filter(x => x.date === dS); let html = `<div class="cal-cell ${dS === dsT ? 'cal-is-today' : ''}"><div class="cal-date">${d}</div><div class="staff-tag-group">`; dayData.forEach(x => { if(!["事項","早班值日","晚班值日"].includes(x.staff_name)){ const s = parseShift(x.shift_code); if(s.isW) html += `<div class="staff-tag-full ${s.type==='night'?'s-X':'s-O'}">${x.staff_name.substring(0,1)}:${s.disp.substring(0,1)}</div>`; } }); grid.innerHTML += html + `</div></div>`; } }
-function parseShift(c){ c=String(c||'').toUpperCase(); if(!c||['休','OFF','例'].includes(c)) return {isW:false}; const m={'O':'早','X':'晚','10':'10'}; return {isW:true, disp:m[c]||c, type:(c.includes('X')||c==='10')?'night':'day'}; }
-window.toggleCalMode = (m) => { calMode=m; fetchMainData(); };
+function renderCalendar() { const grid = document.getElementById('cal-grid'); if(!grid) return; grid.innerHTML = ''; const y = selectedDate.getFullYear(), m = selectedDate.getMonth(), days = new Date(y, m+1, 0).getDate(), dsT = new Date().toISOString().split('T')[0]; for(let d=1; d<=days; d++) { const dS = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; const dayData = allMonthData.filter(x => x.date === dS); let html = `<div class="cal-cell ${dS === dsT ? 'cal-is-today' : ''}"><div class="cal-date">${d}</div><div class="staff-tag-group" style="display:flex; flex-wrap:wrap; gap:1px; font-size:0.5rem;">`; dayData.forEach(x => { if(!["事項","早班值日","晚班值日"].includes(x.staff_name)){ html += `<span>${x.staff_name.substring(0,1)}</span>`; } }); grid.innerHTML += html + `</div></div>`; } }
+window.changeDate = (n) => { selectedDate.setDate(selectedDate.getDate()+n); fetchMainData(); };
