@@ -2,7 +2,7 @@ import os
 import requests
 from supabase import create_client
 
-# 1. 初始化 Supabase
+# 初始化 Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -15,20 +15,23 @@ CATEGORIES = {
 }
 
 def get_poya_data():
-    # 使用 ScraperAnt 或類似的免費轉發服務 (這裡我們先用最穩定的主域名 API)
-    # 我們換一個 API 進入點，這個路徑通常對資料中心 IP 較寬鬆
-    api_url = "https://www.poyabuy.com.tw/MobileApi/v1/SalePage/SearchList"
+    # 使用 91APP 體系最底層、最不容易報 406 的 API 入口
+    api_url = "https://api.poyabuy.com.tw/MobileApi/v1/SalePage/SearchList"
     
+    # 深度偽裝 Header，模擬真正的 iPhone 請求
     headers = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Content-Type": "application/json;charset=UTF-8",
         "Origin": "https://www.poyabuy.com.tw",
-        "Referer": "https://www.poyabuy.com.tw/"
+        "Referer": "https://www.poyabuy.com.tw/",
+        "X-Requested-With": "XMLHttpRequest"
     }
 
     for cat_name, cat_id in CATEGORIES.items():
-        print(f"--- 📡 正在請求 API: {cat_name} ---")
+        print(f"--- 📡 正在請求 API: {cat_name} (ID: {cat_id}) ---")
+        
         payload = {
             "ShopId": 1104,
             "SalePageCategoryId": int(cat_id),
@@ -38,8 +41,9 @@ def get_poya_data():
         }
 
         try:
-            # 這是重點：我們直接請求主域名，並增加 timeout
-            response = requests.post(api_url, json=payload, headers=headers, timeout=60)
+            # 使用 Session 保持連線特徵
+            session = requests.Session()
+            response = session.post(api_url, json=payload, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -58,17 +62,17 @@ def get_poya_data():
                                 "category": cat_name
                             })
                     
+                    # 存入 Supabase
                     supabase.table("poya_items").upsert(data_list, on_conflict="title").execute()
-                    print(f"💾 {cat_name} 資料已更新至 Supabase")
+                    print(f"💾 {cat_name} 資料已存入 Supabase")
                 else:
-                    print(f"⚠️ 請求成功但回傳空數據")
+                    print(f"⚠️ API 成功但 Data 為空，內容: {response.text[:200]}")
             else:
                 print(f"❌ API 失敗，狀態碼: {response.status_code}")
-                # 如果 403 或其他錯誤，這代表我們必須使用 Web 代理
+                # 提示：如果是 403/406，通常是 User-Agent 或 Header 被擋
                 
         except Exception as e:
-            print(f"❌ 發生異常: {e}")
-            print("💡 提示：這代表 GitHub 環境完全無法連線至寶雅。")
+            print(f"❌ 異常: {e}")
 
 if __name__ == "__main__":
     get_poya_data()
