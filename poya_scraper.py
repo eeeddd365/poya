@@ -2,12 +2,11 @@ import os
 import requests
 from supabase import create_client
 
-# 初始化 Supabase
+# 1. 讀取環境變數
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 正確的分類 ID
 CATEGORIES = {
     "紙棉用品": "374016",
     "居家清潔": "374018",
@@ -23,7 +22,7 @@ def get_poya_data():
     }
 
     for cat_name, cat_id in CATEGORIES.items():
-        print(f"📡 正在從 API 請求: {cat_name}...")
+        print(f"📡 正在請求: {cat_name}...") # 這一行會印在 GitHub Action 日誌裡
         payload = {
             "SalePageCategoryId": int(cat_id),
             "SortMode": "Sales",
@@ -50,11 +49,13 @@ def get_poya_data():
                         })
 
                 if data_list:
+                    # 寫入 Supabase
                     supabase.table("poya_items").upsert(data_list, on_conflict="title").execute()
             else:
                 print(f"❌ API 失敗: {response.status_code}")
         except Exception as e:
             print(f"❌ 異常: {e}")
 
+# 關鍵：沒有這一行就不會執行
 if __name__ == "__main__":
     get_poya_data()
