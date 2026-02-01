@@ -29,7 +29,7 @@ window.toggleCalMode = function(m) {
     renderCalendar();
 };
 
-// --- Excel 智慧匯入 (雙碼對應 + 舊資料轉移) ---
+// --- Excel 智慧匯入 ---
 window.importInventoryExcel = function(input) {
     const file = input.files[0]; if(!file) return;
     setLoad(true);
@@ -39,40 +39,24 @@ window.importInventoryExcel = function(input) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
             const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
-            
             const { data: dbData } = await _sb.from('inventory').select('id, barcode');
             const dbBarcodeMap = new Map();
             dbData.forEach(item => dbBarcodeMap.set(String(item.barcode), item.id));
-
             let added = 0, migrated = 0;
             const rowsToUpsert = [];
-
             for(let r of rows.slice(1)) {
                 if(!r[0]) continue;
-                const storeCode = String(r[0]).trim(); // A:店內碼 (21000...)
-                const intlCode = r[1] ? String(r[1]).trim() : null; // B:國際碼
+                const storeCode = String(r[0]).trim(); 
+                const intlCode = r[1] ? String(r[1]).trim() : null;
                 const name = r[2] ? String(r[2]).trim() : "未命名";
-
-                // 若舊資料庫 barcode 欄位存的是這筆資料的國際碼 (且不是店內碼開頭)
                 if(intlCode && dbBarcodeMap.has(intlCode) && !intlCode.startsWith('21000')) {
-                    await _sb.from('inventory').update({ 
-                        barcode: storeCode, 
-                        international_code: intlCode, 
-                        item_name: name 
-                    }).eq('id', dbBarcodeMap.get(intlCode));
+                    await _sb.from('inventory').update({ barcode: storeCode, international_code: intlCode, item_name: name }).eq('id', dbBarcodeMap.get(intlCode));
                     migrated++;
                 } else {
-                    rowsToUpsert.push({ 
-                        barcode: storeCode, 
-                        international_code: intlCode, 
-                        item_name: name, 
-                        dept: storeCode.substring(0,2), 
-                        qty: 0 
-                    });
+                    rowsToUpsert.push({ barcode: storeCode, international_code: intlCode, item_name: name, dept: storeCode.substring(0,2), qty: 0 });
                     added++;
                 }
             }
-
             if(rowsToUpsert.length > 0) {
                 const chunkSize = 50;
                 for (let i = 0; i < rowsToUpsert.length; i += chunkSize) {
@@ -86,7 +70,6 @@ window.importInventoryExcel = function(input) {
     reader.readAsArrayBuffer(file);
 };
 
-// --- 自動填充與比對邏輯 ---
 window.autoFillByBarcode = async (val) => {
     if(val.length < 5) return;
     const { data } = await _sb.from('inventory').select('*').or(`barcode.eq.${val},international_code.eq.${val}`).limit(1);
@@ -101,18 +84,22 @@ window.autoFillByBarcode = async (val) => {
             document.getElementById('i-exist-img').style.display = 'block';
         } else { existPhotoPath = null; document.getElementById('i-exist-img').style.display = 'none'; }
     } else {
-        nameInput.value = ""; nameInput.readOnly = false; // 查無解鎖
+        nameInput.value = ""; nameInput.readOnly = false;
         document.getElementById('i-exist-img').style.display = 'none';
     }
 };
 
-// --- 倉庫業務 ---
 window.searchInventory = function() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async () => {
-        const b = document.getElementById('q-barcode').value; if(!b) { document.getElementById('inv-results').innerHTML = ""; return; }
+        const d = document.getElementById('q-dept').value;
+        const b = document.getElementById('q-barcode').value;
+        if(!d && !b) { document.getElementById('inv-results').innerHTML = ""; return; }
         setLoad(true);
-        const { data } = await _sb.from('inventory').select('*').or(`barcode.ilike.%${b}%,international_code.ilike.%${b}%,item_name.ilike.%${b}%`).order('created_at', {ascending: false});
+        let qry = _sb.from('inventory').select('*');
+        if(d) qry = qry.eq('dept', d);
+        if(b) qry = qry.or(`barcode.ilike.%${b}%,international_code.ilike.%${b}%,item_name.ilike.%${b}%`);
+        const { data } = await qry.order('created_at', {ascending: false});
         const res = document.getElementById('inv-results');
         res.innerHTML = data?.map(i => {
             const u = i.photo_path ? _sb.storage.from('photos').getPublicUrl(i.photo_path).data.publicUrl : '';
@@ -129,7 +116,7 @@ window.openAdjust = (id, name, qty, imgUrl, note) => {
     document.getElementById('adj-title').innerText = name;
     document.getElementById('adj-current-qty').innerText = qty;
     document.getElementById('adj-note').value = note;
-    document.getElementById('adj-img-container').innerHTML = imgUrl ? `<img src="${imgUrl}" style="width:100px; height:100px; object-fit:cover; border-radius:10px;">` : '';
+    document.getElementById('adj-img-container').innerHTML = imgUrl ? `<img src="${u}" style="width:100px; height:100px; object-fit:cover; border-radius:10px;">` : '';
     if(!adjM) adjM = new bootstrap.Modal(document.getElementById('adjustModal'));
     adjM.show();
 };
@@ -148,7 +135,6 @@ window.adjustInventory = async function(type) {
     if(adjM) adjM.hide(); window.searchInventory(); setLoad(false);
 };
 
-// --- 其餘原本功能保持完整 ---
 async function checkLogin() {
     setLoad(true);
     try {
@@ -202,7 +188,7 @@ window.submitInventory = async function() {
     if(!b||!q) return alert("條碼與數量必填"); setLoad(true);
     try {
         let p = existPhotoPath; if(f){ const comp=await imageCompression(f,{maxSizeMB:0.1}); const {data}=await _sb.storage.from('photos').upload(`inv/${Date.now()}.jpg`, comp); p=data.path; }
-        const { data: exist } = await _sb.from('inventory').select('id, qty').or(`barcode.eq.${b},international_code.eq.${b}`).limit(1);
+        const { data: exist } = await _sb.from('inventory').select('id, qty').or(`barcode.eq.${b},international_code.eq.${val}`).limit(1);
         if(exist && exist.length > 0) await _sb.from('inventory').update({ item_name: n, qty: exist[0].qty + parseInt(q), note: nt, photo_path: p }).eq('id', exist[0].id);
         else await _sb.from('inventory').insert([{ dept: b.substring(0,2), barcode: b, item_name: n||'新商品', qty: parseInt(q), note: nt, photo_path: p, creator: currentUser.name }]);
         if(nWho) await _sb.from('stock_items').insert([{ sender_name: currentUser.name, owner_name: nWho, note: `入倉: ${n||b}`, photo_path: p, status: '待處理' }]);
